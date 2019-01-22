@@ -67,10 +67,12 @@ def integrate(params, init=None):
     network = scipy.integrate.ode(dynamical_equation)
     network.set_integrator('dopri5')
     network.set_initial_value(theta_t[0], params.t_start)
-    network.set_f_params(params.d_n, params.n, params.kappa, params.k_in_mean, params.A.astype('float'), params.eta)
+    network.set_f_params(params.d_n, params.n, params.kappa, params.k_in_mean,
+                         params.A.astype('float'), params.eta)
 
     # Time integration
-    print('Network with', params.N, 'nodes | Integrating', params.t_end, 'time units:')
+    print('Network with', params.N, 'nodes | Integrating', params.t_end,
+          'time units:')
     computation_start = time()
     step = 1
     while network.successful() and step <= params.t_steps:
@@ -79,5 +81,6 @@ def integrate(params, init=None):
         progress = step / params.t_steps
         tn.utils.progress_bar(progress, time()-computation_start)
         step += 1
+    print('    Successful. \n')
 
     return theta_t

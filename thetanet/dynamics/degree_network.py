@@ -26,7 +26,8 @@ def dynamical_equation(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa):
     eta_0 : float
         Center of Cauchy distribution of intrinsic excitabilities.
     delta : float
-        Half width at half maximum of Cauchy distribution of intrinsic excitabilities.
+        Half width at half maximum of Cauchy distribution of intrinsic
+        excitabilities.
     kappa : float
         Coupling constant.
 
@@ -41,7 +42,8 @@ def dynamical_equation(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa):
         P += Gamma[p] * (y ** p + np.conjugate(y) ** p)
     P *= d_n
     I = np.tensordot(Q, P, axes=(0, 0))  # axis 0 refers to k^\prime_in
-    dydt = -1j * 0.5 * (y - 1) ** 2 + 1j * 0.5 * (y + 1) ** 2 * (eta_0 + 1j * delta + kappa * I)
+    dydt = -1j * 0.5 * (y - 1) ** 2 + \
+           1j * 0.5 * (y + 1) ** 2 * (eta_0 + 1j * delta + kappa * I)
 
     return dydt
 
@@ -64,11 +66,13 @@ def integrate(params, init=None):
 
     if params.degree_approach == 'full':
         N_state_variables = params.N_k_in
-        Q = np.squeeze(np.tensordot(params.P_k[..., None], params.a, axes=(1, 1)))
+        Q = np.squeeze(np.tensordot(params.P_k[..., None], params.a,
+                                    axes=(1, 1)))
 
     elif params.degree_approach == 'virtual':
         N_state_variables = params.N_mu_in
-        Q = np.squeeze(np.tesordot(params.w[..., None] * params.a_virt, axes=(1, 1)))
+        Q = np.squeeze(np.tesordot(params.w[..., None] * params.a_virt,
+                                   axes=(1, 1)))
 
     elif params.degree_approach == 'trans':
         N_state_variables = params.N_k_in_occurrence
@@ -84,10 +88,12 @@ def integrate(params, init=None):
     network = scipy.integrate.ode(dynamical_equation)
     network.set_integrator('zvode')
     network.set_initial_value(b_t[0], params.t_start)
-    network.set_f_params(params.Gamma, params.n, params.d_n, Q, params.eta_0, params.delta, params.kappa)
+    network.set_f_params(params.Gamma, params.n, params.d_n, Q, params.eta_0,
+                         params.delta, params.kappa)
 
     # Time integration
-    print('Network with', N_state_variables, 'degrees | Integrating', params.t_end, 'time units:')
+    print('Network with', N_state_variables, 'degrees | Integrating',
+          params.t_end, 'time units:')
     computation_start = time()
     step = 1
     while network.successful() and step <= params.t_steps:
@@ -96,5 +102,6 @@ def integrate(params, init=None):
         progress = step / params.t_steps
         tn.utils.progress_bar(progress, time() - computation_start)
         step += 1
+    print('    Successful. \n')
 
     return b_t
