@@ -12,16 +12,16 @@ def dynamical_equation(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa):
     ----------
     t : float
         Time.
-    y : 1D array-like float
+    y : array_like, 1D float
         State variable (theta).
-    Gamma: 1D array-like float
+    Gamma: array_like, 1D float
         Factors arising from sophisticated double sum when rewriting the pulse
         function in sinusoidal form.
     n : int
         Sharpness parameter.
     d_n : float
         Normalisation from pulse function.
-    Q : 2D array-like float
+    Q : array_like, 2D float
         Connectivity matrix determining in-degree/in-degree connections.
     eta_0 : float
         Center of Cauchy distribution of intrinsic excitabilities.
@@ -33,7 +33,7 @@ def dynamical_equation(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa):
 
     Returns
     -------
-    dy/dt : 1D array-like float
+    dy/dt : array_like, 1D float
         Time derivative at time t.
     """
 
@@ -55,12 +55,12 @@ def integrate(params, init=None):
     ----------
     params : parameter.py
         Parameter file
-    init : 1D array-like float
+    init : array_like, 1D float
         Initial conditions
 
     Returns
     -------
-    b_t : 2D array-like float [time, degree]
+    b_t : array_like, 2D float [time, degree]
         Degree states at respective times.
     """
 

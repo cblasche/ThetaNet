@@ -12,7 +12,7 @@ def dynamical_equation(t, y, d_n, n, kappa, k_in_mean, A, eta):
     ----------
     t : float
         Time
-    y : 1D array-like float
+    y : array_like, 1D float
         State variable (theta)
     d_n : float
         Normalisation from pulse function
@@ -22,14 +22,14 @@ def dynamical_equation(t, y, d_n, n, kappa, k_in_mean, A, eta):
         Coupling constant
     k_in_mean : float
         Mean value of all in-degrees
-    A : 2D array-like int
+    A : array_like, 2D int
         Adjacency matrix
-    eta: 1D array-like float
+    eta: array_like, 1D float
         Intrinsic excitabilities
 
     Returns
     -------
-    dy/dt : 1D array-like float
+    dy/dt : array_like, 1D float
         Time derivative at time t.
     """
 
@@ -47,12 +47,12 @@ def integrate(params, init=None):
     ----------
     params : parameter.py
         Parameter file
-    init : 1D array-like float
+    init : array_like, 1D float
         Initial conditions
 
     Returns
     -------
-    theta_t : 2D array-like float [time, neuron]
+    theta_t : array_like, 2D float [time, neuron]
         Neuron states at respective times.
     """
 
