@@ -235,20 +235,21 @@ def correlation_from_sequences(K_in, K_out):
     return rho
 
 
-def swap_pair(K):
-    """ Swap two entries in a sequence.
+def swap_pair(x):
+    """ Swap two entries in first dimension of an array.
+    Application in degree sequence (scalars) or in adjacency matrix (rows)
 
     Parameters
     ----------
-    K : array_like, 1D int
+    x : array_like
 
     Returns
     -------
-    K will be modified.
+    x will be modified.
     """
 
-    random_pair = np.random.choice(len(K), 2)
-    K[random_pair] = np.flipud(K[random_pair])
+    random_pair = np.random.choice(x.shape[0], 2)
+    x[random_pair] = np.flipud(x[random_pair])
 
     return
 
@@ -287,4 +288,5 @@ def degree_sequence(k_in, P_k_in, k_out, P_k_out, N, rho=0):
     K_in, K_out = degree_sequence_double(k_in, P_k_in, k_out, P_k_out, N)
     correlate_sequences(K_in, K_out, rho)
     print('    Successful. \n')
+
     return K_in, K_out
