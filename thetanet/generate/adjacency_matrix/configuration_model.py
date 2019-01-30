@@ -366,7 +366,7 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out'):
 
 def assortativity_coefficient(A, i_prop='in', j_prop='out'):
     """ Compute the assortativity coefficient with respect to chosen
-     properties. Connections are from neuron j to i.
+    properties. Connections are from neuron j to i.
 
     Parameters
     ----------
