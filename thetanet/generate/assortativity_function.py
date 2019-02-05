@@ -101,7 +101,7 @@ def a_func_empirical(A, k_in, P_k_in, k_out, P_k_out, i_prop='in',
     return a
 
 
-def r_from_a_func(a, k_out, k_in, k_mean):
+def a_coef_from_a_func(a, k_out, k_in, k_mean):
     """ Compute assortativity coefficient r from a assortativity function a.
 
     Parameters
@@ -126,5 +126,3 @@ def r_from_a_func(a, k_out, k_in, k_mean):
     r = cor / std_out / std_in
 
     return r
-
-

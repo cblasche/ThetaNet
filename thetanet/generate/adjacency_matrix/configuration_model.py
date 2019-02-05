@@ -321,7 +321,7 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out'):
     # Compute sequences
     K_in = A.sum(axis=1)
     K_out = A.sum(axis=0)
-    K_mean = np.sum(K_in ** 2) / A.sum()    # K_in_mean and K_out_mean are equal
+    K_mean = K_in.mean()    # K_in_mean and K_out_mean are equal
 
     # Match them to their respective property of pre-(j) and post-(i)-synaptic
     # neuron
@@ -329,7 +329,7 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out'):
     K_j_prop = eval('K_' + j_prop)
 
     # Converge to desired assortativity
-    r_diff = r - assortativity_coefficient(A, i_prop, j_prop)
+    r_diff = r - assort_coef_from_matrix(A, i_prop, j_prop)
     iteration = 0
     limited_edges = int(A.sum())    # start with considering all edges
     while abs(r_diff) > 0.01:
@@ -352,7 +352,7 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out'):
         A_dummy = np.copy(A)
         reconnect_edge_pair(A_dummy, I[:, swap], J[:, swap])
         remove_multi_edges(A_dummy)
-        r_diff_dummy = r - assortativity_coefficient(A_dummy, i_prop, j_prop)
+        r_diff_dummy = r - assort_coef_from_matrix(A_dummy, i_prop, j_prop)
         if abs(r_diff_dummy) < abs(r_diff):
             A = A_dummy
             r_diff = r_diff_dummy
@@ -364,7 +364,7 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out'):
     return
 
 
-def assortativity_coefficient(A, i_prop='in', j_prop='out'):
+def assort_coef_from_matrix(A, i_prop='in', j_prop='out'):
     """ Compute the assortativity coefficient with respect to chosen
     properties. Connections are from neuron j to i.
 

@@ -24,7 +24,7 @@ def degree_sequence_single(k, P_k, N):
     x = np.append(np.zeros(1), x)  # add a zero at the beginning
     X = np.random.uniform(x[0], x[-1], size=N)  # N random values from cumsum
     k = np.append(k, k[-1] + 1)
-    K = np.floor(np.interp(X, x, k))  # get N degree, according to X
+    K = np.floor(np.interp(X, x, k))  # get N degrees, according to X
 
     return K.astype(int)
 
