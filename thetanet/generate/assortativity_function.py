@@ -102,48 +102,10 @@ def a_func_empirical(A, k_in, P_k_in, k_out, P_k_out, i_prop='in',
     return a
 
 
-def a_coef_from_a_func(a, k_in, k_out, k_mean, i_prop='in', j_prop='out'):
-    """ Compute assortativity coefficient r from a assortativity function a.
-
-    Parameters
-    ----------
-    a : array_like, 2D float
-        Assortativity function.
-    k_in : array_like, 1D int
-        In-degree space.
-    k_out : array_like, 1D int
-        Out-degree space.
-    k_mean : float
-        Mean degree.
-    i_prop : str
-        Respective node degree which is involved in assortative mixing.
-        ('in' or 'out').
-    j_prop : str
-        Respective node degree which is involved in assortative mixing.
-        ('in' or 'out').
-
-    Returns
-    -------
-    r : float
-        Assortativity coefficient.
-    """
-
-    k_i_prop = eval('k_' + i_prop)
-    k_j_prop = eval('k_' + j_prop)
-
-    mesh_k_j, mesh_k_i = np.meshgrid(k_j_prop, k_i_prop)
-    cor = np.sum((mesh_k_j - k_mean) * (mesh_k_i - k_mean) * a)
-    std_j = np.sqrt(np.sum((mesh_k_j - k_mean) ** 2 * a))
-    std_i = np.sqrt(np.sum((mesh_k_i - k_mean) ** 2 * a))
-    r = cor / std_j / std_i
-
-    return r
-
-
 def a_coef_from_a_func(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop='in',
                        j_prop='out'):
     """ Compute the assortativity coefficient from an assortativity function.
-    Reconstruct 'counts' one would gain from the adjacency matrix first and
+    Reconstruct 'count_func' one would gain from the adjacency matrix first and
     then compute correlation.
 
     Parameters
@@ -180,11 +142,11 @@ def a_coef_from_a_func(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop='in',
     P_k_i = eval('P_k_' + i_prop)
     P_k_j = eval('P_k_' + j_prop)
 
-    counts = a * np.outer(P_k_j, P_k_i) * N ** 2
+    count_func = a * np.outer(P_k_j, P_k_i) * N ** 2
     mesh_k_j, mesh_k_i = np.meshgrid(k_j, k_i)
-    cor = np.sum((mesh_k_j - k_mean) * (mesh_k_i - k_mean) * counts)
-    std_j = np.sqrt(np.sum((mesh_k_j - k_mean) ** 2 * counts))
-    std_i = np.sqrt(np.sum((mesh_k_i - k_mean) ** 2 * counts))
+    cor = np.sum((mesh_k_j - k_mean) * (mesh_k_i - k_mean) * count_func)
+    std_j = np.sqrt(np.sum((mesh_k_j - k_mean) ** 2 * count_func))
+    std_i = np.sqrt(np.sum((mesh_k_i - k_mean) ** 2 * count_func))
     r = cor / std_j / std_i
 
     return r
