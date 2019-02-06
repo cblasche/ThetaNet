@@ -271,7 +271,7 @@ def degree_sequence(k_in, P_k_in, k_out, P_k_out, N, rho=0):
     P_k_out : array_like, 1D float
         Out-degree probability.
     N : int
-        Number of neurons
+        Number of neurons.
     rho : float
         In-/out-degree correlation.
 

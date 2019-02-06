@@ -46,9 +46,9 @@ def integrate(params, init=None):
     Parameters
     ----------
     params : parameter.py
-        Parameter file
+        Parameter file.
     init : array_like, 1D float
-        Initial conditions
+        Initial conditions.
 
     Returns
     -------

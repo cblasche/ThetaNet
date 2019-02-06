@@ -53,6 +53,8 @@ def configuration_model(K_in, K_out, r=0, i_prop='in', j_prop='out'):
         assortative_mixing(A, r, i_prop, j_prop)
         print('      Successful.')
 
+    print('\n')
+
     return A
 
 
@@ -354,7 +356,7 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out'):
         remove_multi_edges(A_dummy)
         r_diff_dummy = r - assort_coef_from_matrix(A_dummy, i_prop, j_prop)
         if abs(r_diff_dummy) < abs(r_diff):
-            A = A_dummy
+            A[...] = A_dummy[...]
             r_diff = r_diff_dummy
             print('\r      Iteration', iteration, ': r_diff =', r_diff)
         else:

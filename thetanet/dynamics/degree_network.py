@@ -54,9 +54,9 @@ def integrate(pm, init=None):
     Parameters
     ----------
     pm : parameter.py
-        Parameter file
+        Parameter file.
     init : array_like, 1D float
-        Initial conditions
+        Initial conditions.
 
     Returns
     -------
@@ -66,17 +66,22 @@ def integrate(pm, init=None):
 
     if pm.degree_approach == 'full':
         N_state_variables = pm.N_k_in
-        Q = np.squeeze(np.tensordot(pm.P_k[..., None], pm.a,
-                                    axes=(1, 1)))
+        Q = pm.P_k_in[:, None] * pm.a
+        # Q = np.squeeze(np.tensordot(pm.P_k[..., None], pm.a,
+        #                            axes=(1, 1)))
 
     elif pm.degree_approach == 'virtual':
         N_state_variables = pm.N_mu_in
-        Q = np.squeeze(np.tesordot(pm.w[..., None] * pm.a_v,
-                                   axes=(1, 1)))
+        Q = pm.w_in[:, None] * pm.a_v
 
     elif pm.degree_approach == 'transform':
-        N_state_variables = pm.N_k_in_occurrence
+        N_state_variables = pm.N_k_in
         Q = 1 / pm.k_in_mean * pm.E
+
+    else:
+        print('\n "degree_approach" is none of the possible choices "full",'
+              '"virtual" or "transform".')
+        quit(1)
 
     # Initialise network for t=0
     b_t = 1j * np.zeros((pm.t_steps + 1, N_state_variables))
