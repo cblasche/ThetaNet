@@ -17,18 +17,18 @@ def three_term_recursion(N_mu, k, P_k):
     N_mu : int
         Number of roots of highest polynomial (k_v), hence there are
         N_mu+1 polynomials.
-    k : array_like, 1D int
+    k : ndarray, 1D int
         Degree space.
-    P_k : array_like, 1D float
+    P_k : ndarray, 1D float
         Degree probability.
 
     Returns
     -------
-    k_v : array_like, 1D float
+    k_v : ndarray, 1D float
         Virtual degrees / roots of highest polynomial.
-    w : array_like, 1D float
+    w : ndarray, 1D float
         Weights of virtual degrees.
-    q : array_like, 2D float
+    q : ndarray, 2D float
         Polynomials [degree, k].
     """
 
@@ -67,16 +67,16 @@ def func_v(f, k, k_v):
 
     Parameters
     ----------
-    f : array_like, 2D float
+    f : ndarray, 2D float
         Function stack to be 'virtualised' - interpolated on virtual degree space.
-    k : array_like, 1D int
+    k : ndarray, 1D int
         Degree space.
-    k_v : array_like, 1D float
+    k_v : ndarray, 1D float
         Virtual degree space.
 
     Returns
     -------
-    f_v : array_like, 2D float
+    f_v : ndarray, 2D float
         [polynomial degree (mu), function values of f at virtual degrees]
     """
 

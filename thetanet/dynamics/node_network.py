@@ -12,7 +12,7 @@ def dynamical_equation(t, y, d_n, n, kappa, k_in_mean, A, eta):
     ----------
     t : float
         Time
-    y : array_like, 1D float
+    y : ndarray, 1D float
         State variable (theta)
     d_n : float
         Normalisation from pulse function
@@ -22,14 +22,14 @@ def dynamical_equation(t, y, d_n, n, kappa, k_in_mean, A, eta):
         Coupling constant
     k_in_mean : float
         Mean value of all in-degrees
-    A : array_like, 2D int
+    A : ndarray, 2D int
         Adjacency matrix
-    eta: array_like, 1D float
+    eta: ndarray, 1D float
         Intrinsic excitabilities
 
     Returns
     -------
-    dy/dt : array_like, 1D float
+    dy/dt : ndarray, 1D float
         Time derivative at time t.
     """
 
@@ -47,19 +47,19 @@ def integrate(params, init=None):
     ----------
     params : parameter.py
         Parameter file.
-    init : array_like, 1D float
+    init : ndarray, 1D float
         Initial conditions.
 
     Returns
     -------
-    theta_t : array_like, 2D float [time, neuron]
+    theta_t : ndarray, 2D float [time, neuron]
         Neuron states at respective times.
     """
 
     # Initialise network for t=0
     theta_t = np.zeros((params.t_steps + 1, params.N))
     # If init is not specified, choose uniform distribution.
-    if not init:
+    if init is None:
         init = np.linspace(0, 2 * np.pi * (1 - 1 / float(params.N)), params.N)
     theta_t[0] = init
 

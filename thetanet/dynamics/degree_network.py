@@ -12,7 +12,7 @@ def dynamical_equation(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa):
     ----------
     t : float
         Time.
-    y : array_like, 1D float
+    y : ndarray, 1D float
         State variable (theta).
     Gamma: array_like, 1D float
         Factors arising from sophisticated double sum when rewriting the pulse
@@ -21,7 +21,7 @@ def dynamical_equation(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa):
         Sharpness parameter.
     d_n : float
         Normalisation from pulse function.
-    Q : array_like, 2D float
+    Q : ndarray, 2D float
         Connectivity matrix determining in-degree/in-degree connections.
     eta_0 : float
         Center of Cauchy distribution of intrinsic excitabilities.
@@ -33,7 +33,7 @@ def dynamical_equation(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa):
 
     Returns
     -------
-    dy/dt : array_like, 1D float
+    dy/dt : ndarray, 1D float
         Time derivative at time t.
     """
 
@@ -41,7 +41,7 @@ def dynamical_equation(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa):
     for p in range(1, n + 1):
         P += Gamma[p] * (y ** p + np.conjugate(y) ** p)
     P *= d_n
-    I = np.tensordot(Q, P, axes=(0, 0))  # axis 0 refers to k^\prime_in
+    I = np.tensordot(Q, P, axes=(1, 0))  # axis 1 refers to k^\prime_in
     dydt = -1j * 0.5 * (y - 1) ** 2 + \
            1j * 0.5 * (y + 1) ** 2 * (eta_0 + 1j * delta + kappa * I)
 
@@ -55,24 +55,24 @@ def integrate(pm, init=None):
     ----------
     pm : parameter.py
         Parameter file.
-    init : array_like, 1D float
+    init : ndarray, 1D float
         Initial conditions.
 
     Returns
     -------
-    b_t : array_like, 2D float [time, degree]
+    b_t : ndarray, 2D float [time, degree]
         Degree states at respective times.
     """
 
     if pm.degree_approach == 'full':
         N_state_variables = pm.N_k_in
-        Q = pm.P_k_in[:, None] * pm.a
+        Q = pm.P_k_in[None, :] * pm.a * (pm.N / pm.k_mean)
         # Q = np.squeeze(np.tensordot(pm.P_k[..., None], pm.a,
         #                            axes=(1, 1)))
 
     elif pm.degree_approach == 'virtual':
         N_state_variables = pm.N_mu_in
-        Q = pm.w_in[:, None] * pm.a_v
+        Q = pm.w_in[None, :] * pm.a_v * (pm.N / pm.k_mean)
 
     elif pm.degree_approach == 'transform':
         N_state_variables = pm.N_k_in
@@ -85,7 +85,7 @@ def integrate(pm, init=None):
 
     # Initialise network for t=0
     b_t = 1j * np.zeros((pm.t_steps + 1, N_state_variables))
-    if not init:
+    if init is None:
         init = 1j * np.zeros(N_state_variables)
     b_t[0] = init
 
@@ -125,7 +125,7 @@ def Gamma(n):
 
     Returns
     -------
-    Gamma : array_like, 1D float
+    Gamma : ndarray, 1D float
         Array holding the parameters Gamma(n)
     """
 

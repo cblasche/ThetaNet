@@ -7,16 +7,16 @@ def degree_sequence_single(k, P_k, N):
 
     Parameters
     ----------
-    k : array_like, 1D int
+    k : ndarray, 1D int
         Degree space.
-    P_k : array_like, 1D float
+    P_k : ndarray, 1D float
         Degree probability.
     N : int
         Number of neurons.
 
     Returns
     -------
-    K : array_like, 1D int
+    K : ndarray, 1D int
         Degree sequence.
     """
 
@@ -35,13 +35,13 @@ def degree_sequences_match(k_in, P_k_in, k_out, P_k_out):
 
     Parameters
     ----------
-    k_in : array_like, 1D int
+    k_in : ndarray, 1D int
         In-degree space.
-    P_k_in : array_like, 1D float
+    P_k_in : ndarray, 1D float
         In-degree probability.
-    k_out : array_like, 1D int
+    k_out : ndarray, 1D int
         Out-degree space.
-    P_k_out : array_like, 1D float
+    P_k_out : ndarray, 1D float
         Out-degree probability.
 
     Returns
@@ -68,22 +68,22 @@ def degree_sequence_double(k_in, P_k_in, k_out, P_k_out, N):
 
     Parameters
     ----------
-    k_in : array_like, 1D int
+    k_in : ndarray, 1D int
         In-degree space.
-    P_k_in : array_like, 1D float
+    P_k_in : ndarray, 1D float
         In-degree probability.
-    k_out : array_like, 1D int
+    k_out : ndarray, 1D int
         Out-degree space.
-    P_k_out : array_like, 1D float
+    P_k_out : ndarray, 1D float
         Out-degree probability.
     N : int
         Number of neurons.
 
     Returns
     -------
-    K_in : array_like, 1D int
+    K_in : ndarray, 1D int
         In-degree sequence.
-    K_out : array_like, 1D int
+    K_out : ndarray, 1D int
         Out-degree sequence.
     """
 
@@ -116,13 +116,13 @@ def match_degree_sequences(k_in, K_in, k_out, K_out):
 
     Parameters
     ----------
-    k_in : array_like, 1D int
+    k_in : ndarray, 1D int
         In-degree space.
-    K_in : array_like, 1D int
+    K_in : ndarray, 1D int
         In-degree sequence.
-    k_out : array_like, 1D int
+    k_out : ndarray, 1D int
         Out-degree space.
-    K_out : array_like, 1D int
+    K_out : ndarray, 1D int
         Out-degree sequence.
 
     Returns
@@ -139,9 +139,9 @@ def match_degree_sequences(k_in, K_in, k_out, K_out):
 
         Parameters
         ----------
-        K : array_like, 1D int
+        K : ndarray, 1D int
             Degree sequence.
-        k : array_like, 1D int
+        k : ndarray, 1D int
             Degree space.
         d : int
             Number of connection to be adjusted. The sign of d indicates in
@@ -183,9 +183,9 @@ def correlate_sequences(K_in, K_out, rho):
 
     Parameters
     ----------
-    K_in : array_like, 1D int
+    K_in : ndarray, 1D int
         In-degree sequence.
-    K_out : array_like, 1D int
+    K_out : ndarray, 1D int
         Out-degree sequence.
     rho : float
         In-/out-degree correlation.
@@ -218,9 +218,9 @@ def correlation_from_sequences(K_in, K_out):
 
     Parameters
     ----------
-    K_in : array_like, 1D int
+    K_in : ndarray, 1D int
         In-degree sequence.
-    K_out : array_like, 1D int
+    K_out : ndarray, 1D int
         Out-degree sequence.
 
     Returns
@@ -241,7 +241,7 @@ def swap_pair(x):
 
     Parameters
     ----------
-    x : array_like
+    x : ndarray
 
     Returns
     -------
@@ -262,13 +262,13 @@ def degree_sequence(k_in, P_k_in, k_out, P_k_out, N, rho=0):
 
     Parameters
     ----------
-    k_in : array_like, 1D int
+    k_in : ndarray, 1D int
         In-degree space.
-    P_k_in : array_like, 1D float
+    P_k_in : ndarray, 1D float
         In-degree probability.
-    k_out : array_like, 1D int
+    k_out : ndarray, 1D int
         Out-degree space.
-    P_k_out : array_like, 1D float
+    P_k_out : ndarray, 1D float
         Out-degree probability.
     N : int
         Number of neurons.
@@ -277,9 +277,9 @@ def degree_sequence(k_in, P_k_in, k_out, P_k_out, N, rho=0):
 
     Returns
     -------
-    K_in : array_like, 1D int
+    K_in : ndarray, 1D int
         In-degree sequence.
-    K_out : array_like, 1D int
+    K_out : ndarray, 1D int
         Out-degree sequence.
     """
 

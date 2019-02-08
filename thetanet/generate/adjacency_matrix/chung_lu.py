@@ -7,7 +7,7 @@ def correlation_from_matrix(A):
 
     Parameters
     ----------
-    A : array_like, 2D int
+    A : ndarray, 2D int
         Adjacency matrix.
 
     Returns
@@ -31,9 +31,9 @@ def matrix_from_sequence(K_in, K_out, c=0, i_prop='in', j_prop='out'):
 
     Parameters
     ----------
-    K_in : array_like, 1D int
+    K_in : ndarray, 1D int
         In-degree sequence.
-    K_out : array_like, 1D int
+    K_out : ndarray, 1D int
         Out-degree sequence.
     c : float
         Assortativity parameter.
@@ -46,7 +46,7 @@ def matrix_from_sequence(K_in, K_out, c=0, i_prop='in', j_prop='out'):
 
     Returns
     -------
-    A : array_like, 2D int
+    A : ndarray, 2D int
         Adjacency matrix.
     """
 
@@ -71,9 +71,9 @@ def chung_lu_model(K_in, K_out, rho=0, c=0,  i_prop='in', j_prop='out'):
 
     Parameters
     ----------
-    K_in : array_like, 1D int
+    K_in : ndarray, 1D int
         In-degree sequence.
-    K_out : array_like, 1D int
+    K_out : ndarray, 1D int
         Out-degree sequence.
     rho : float
         Correlation coefficient between in- and out-degree
@@ -88,7 +88,7 @@ def chung_lu_model(K_in, K_out, rho=0, c=0,  i_prop='in', j_prop='out'):
 
     Returns
     -------
-    A : array_like, 2D int
+    A : ndarray, 2D int
         Adjacency matrix.
     """
 
@@ -134,7 +134,7 @@ def assortative_mixing_float(T, r, i_prop='in', j_prop='out'):
 
     Parameters
     ----------
-    T : array_like, 2D float
+    T : ndarray, 2D float
         Target adjacency matrix.
     r : float
         Assortativity coefficient.

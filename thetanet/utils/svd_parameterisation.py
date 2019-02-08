@@ -45,8 +45,11 @@ def svd_coef_E(A_stack, r_stack, pd_r, pd_k, k_in, m=2):
 
     u, v, s = svd_from_matrix(A_stack, r_stack, k_in, m)
 
-    correct_signs(u)
-    correct_signs(v)
+    # Due to the svd-routine u and v can have different signs when comparing
+    # them between different realisations. In this case they need to be
+    # flipped. (Can be skipped when processing only one adjacency matrix.)
+    if len(u.shape) == 4:
+        correct_signs(u, v)
 
     u_ens = average_ensemble(u)
     v_ens = average_ensemble(v)
@@ -84,7 +87,7 @@ def svd_E(coef, r):
     coef_u, coef_v, coef_s = coef
     u = func_from_coef(coef_u, r)
     v = func_from_coef(coef_v, r)
-    s = func_from_coef(coef_s, r)
+    s = func_from_coef(coef_s, r)[:, 0]  # Singular values have no degree space
     E = np.dot(np.dot(u.T, np.diag(s)), v)
 
     return E
@@ -95,25 +98,22 @@ def func_from_coef(coef, r):
 
     Parameters
     ----------
-    coef : array_like, 2D/3D float
+    coef : array_like, 3D float
         Coefficients in ascending degree [Order, PolyDegree_r, (DegreeSpace)]
     r : float
         Assortativity coefficient.
 
     Returns
     -------
-    f : array_like, 1D/2D
+    f : array_like, 2D
         Reconstructed basis function or singular value [Number, (DegreeSpace)]
     """
-
-    if len(coef.shape) == 2:
-        np.expand_dims(coef, axis=2)
 
     f = np.zeros((np.size(coef, 0), np.size(coef, 2)))
     for pd in range(np.size(coef, 1)):
         f += coef[:, pd, :] * r ** pd
 
-    return f.squeeze()
+    return f
 
 
 def coef_from_polyfit_r(r_stack, y, pd_r):
@@ -124,7 +124,7 @@ def coef_from_polyfit_r(r_stack, y, pd_r):
     ----------
     r_stack : array_like, 1D float
         Stack of assortativity coefficients corresponding to A_stack.
-    y : array_like, 2D/3D float
+    y : array_like, 3D float
         Basis functions (recommended to use polynomial approximation)
         [Order, AssortativitySpace, (DegreeSpace)]
     pd_r : int
@@ -133,19 +133,16 @@ def coef_from_polyfit_r(r_stack, y, pd_r):
 
     Returns
     -------
-    coef : array_like, 2D/3D float
+    coef : array_like, 3D float
         Coefficients in ascending degree [Order, PolyDegree_r, (DegreeSpace)]
     """
 
-    if len(y.shape) == 2:
-        np.expand_dims(y, axis=2)
-
     coef = np.zeros((np.size(y, 0), pd_r + 1, np.size(y, 2)))
     for m_i in range(np.size(y, 0)):
-        coef[m_i] = np.polyfit(r_stack, y[m_i], pd_r)[::-1, :]  # coefficients come
-        #  in opposite order
+        coef[m_i] = np.polyfit(r_stack, y[m_i], pd_r)[::-1, :]  # coefficients
+        #  come in opposite order
 
-    return coef.squeeze()
+    return coef
 
 
 def polyfit_k(k, y, pd_k):
@@ -165,7 +162,7 @@ def polyfit_k(k, y, pd_k):
     -------
     f : array_like, 3D float
         Polynomial approximation of basis functions.
-        [Order, AssortativitySpace, (DegreeSpace)]
+        [Order, AssortativitySpace, DegreeSpace]
     """
 
     f = np.zeros((np.shape(y)))
@@ -202,37 +199,45 @@ def average_ensemble(f):
     return sum
 
 
-def correct_signs(f):
-    """ Flip signs of basis functions if necessary. Let mean values be positive
-    (without loss of generality).
+def correct_signs(u, v):
+    """ Align signs within the stack of basis functions simultaneously.
+    As a measure use the mean value of u and let this always
+    be positive (without loss of generality).
 
     Parameters
     ----------
-    f : array_like, 3D/4D float
-        SVD basis functions or singular values.
-        [Ensemble, Order, AssortativitySpace, DegreeSpace]
+    u : array_like, 3D/4D float
+        SVD basis functions (left).
+        [(Ensemble), Order, AssortativitySpace, DegreeSpace]
+    v : array_like, 3D/4D float
+        SVD basis functions (right).
+        [(Ensemble), Order, AssortativitySpace, DegreeSpace]
 
     Returns
     -------
-    f will be modified.
+    u and v will be modified.
     """
 
-    wrong_sign = f.mean(-1) < 0
-    f[wrong_sign] = f[wrong_sign] * (-1)
+    wrong_sign = u.mean(-1) < 0
+    u[wrong_sign] = u[wrong_sign] * (-1)
+    v[wrong_sign] = v[wrong_sign] * (-1)
+
+    return
 
 
 def svd_from_matrix(A_stack, r_stack, k_in, m):
-    """
+    """ Apply SVD to each matrix in A_stack and store each basis function
+    u and v and singular values s in a respective large array.
 
     Parameters
     ----------
-    A_stack : array_like, 3D/4D int
+    A_stack : ndarray, 3D/4D int
         Stack of adjacency matrices with different assortativity coefficients.
         Potentially several realisation of each (N_ensemble > 1)
         [(N_ensemble), r, N, N]
-    r_stack : array_like, 1D float
+    r_stack : ndarray, 1D float
         Stack of assortativity coefficients corresponding to A_stack.
-    k_in : array_like, 1D int
+    k_in : ndarray, 1D int
         In-degree space.
     m : int
         Order of reconstruction. After applying Singular Value Decomposition
@@ -241,31 +246,30 @@ def svd_from_matrix(A_stack, r_stack, k_in, m):
 
     Returns
     -------
-    u : array_like, 4D float
+    u : ndarray, 4D float
         SVD basis functions (left).
         [Ensemble, Order, AssortativitySpace, DegreeSpace]
-    v : array_like, 4D float
+    v : ndarray, 4D float
         SVD basis functions (right).
         [Ensemble, Order, AssortativitySpace, DegreeSpace]
-    s : array_like, 3D float
+    s : ndarray, 4D float
         SVD singular values.
-        [Ensemble, Order, AssortativitySpace]
+        [Ensemble, Order, AssortativitySpace, 1(needed for following functions)]
     """
 
-    if len(A_stack.shape) == 4:
-        N_ensemble = A_stack.shape[0]
-    else:
-        N_ensemble = 1
+    if len(A_stack.shape) == 3:
+        A_stack = np.expand_dims(A_stack, 0)
+    N_ensemble = A_stack.shape[0]
 
     u = np.zeros((N_ensemble, m, len(r_stack), len(k_in)))
     v = np.zeros((N_ensemble, m, len(r_stack), len(k_in)))
-    s = np.zeros((N_ensemble, m, len(r_stack)))
+    s = np.zeros((N_ensemble, m, len(r_stack), 1))
     for n in range(N_ensemble):
         for r in range(len(r_stack)):
             E = tn.generate.a_func_transform(A_stack[n, r], k_in)[0]
             u_nr, s_nr, vh_nr = np.linalg.svd(E)
             u[n, :, r, :] = u_nr[:, :m].T
             v[n, :, r, :] = vh_nr.T[:, :m].T
-            s[n, :, r] = s_nr[:m]
+            s[n, :, r, 0] = s_nr[:m]
 
     return u, v, s

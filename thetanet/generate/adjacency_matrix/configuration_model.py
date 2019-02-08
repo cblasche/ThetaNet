@@ -9,9 +9,9 @@ def configuration_model(K_in, K_out, r=0, i_prop='in', j_prop='out'):
 
     Parameters
     ----------
-    K_in : array_like, 1D int
+    K_in : ndarray, 1D int
         In-degree sequence.
-    K_out : array_like, 1D int
+    K_out : ndarray, 1D int
         Out-degree sequence.
     r : float
         Assortativity coefficient.
@@ -24,7 +24,7 @@ def configuration_model(K_in, K_out, r=0, i_prop='in', j_prop='out'):
 
     Returns
     -------
-    A : array_like, 2D int
+    A : ndarray, 2D int
         Adjacency matrix.
     """
 
@@ -63,14 +63,14 @@ def edges_from_sequence(K_in, K_out):
 
     Parameters
     ----------
-    K_in : array_like, 1D int
+    K_in : ndarray, 1D int
         In-degree sequence.
-    K_out : array_like, 1D int
+    K_out : ndarray, 1D int
         Out-degree sequence.
 
     Returns
     -------
-    edges : array_like, 2D int
+    edges : ndarray, 2D int
         Edges of the shape: edges[:, 0] post-synaptic neurons
                             edges[:, 1] pre-synaptic neurons
     """
@@ -97,12 +97,12 @@ def matrix_from_edges(edges):
 
     Parameters
     ----------
-    edges : array_like, 2D int
+    edges : ndarray, 2D int
         Directed edges from edges[:, 1] to edges[:, 0].
 
     Returns
     -------
-    A : array-like, 2D int
+    A : ndarray, 2D int
         Adjacency matrix.
     """
 
@@ -120,11 +120,11 @@ def reconnect_edge_pair(A, I, J):
 
     Parameters
     ----------
-    A : array_like, 2D int
+    A : ndarray, 2D int
         Adjacency matrix.
-    I : array_like, 1D int
+    I : ndarray, 1D int
         An edge from A. I[0] is post-synaptic and I[1] is pre-synaptic.
-    J : array-like, 1D int
+    J : ndarray, 1D int
         An edge from A. J[0] is post-synaptic and J[1] is pre-synaptic.
 
     Returns
@@ -147,7 +147,7 @@ def remove_self_edges(A):
 
     Parameters
     ----------
-    A : array_like, 2D int
+    A : ndarray, 2D int
         Adjacency matrix.
 
     Returns
@@ -195,7 +195,7 @@ def remove_multi_edges(A):
 
     Parameters
     ----------
-    A : array_like, 2D int
+    A : ndarray, 2D int
         Adjacency matrix.
 
     Returns
@@ -243,7 +243,7 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out'):
 
     Parameters
     ----------
-    A : array_like, 2D int
+    A : ndarray, 2D int
         Adjacency matrix.
     r : float
         Assortativity coefficient.
@@ -267,13 +267,13 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out'):
 
         Parameters
         ----------
-        I : array_like, 1D int
+        I : ndarray, 1D int
             An edge from A. I[0] is post-synaptic and I[1] is pre-synaptic.
-        J : array-like, 1D int
+        J : ndarray, 1D int
             An edge from A. J[0] is post-synaptic and J[1] is pre-synaptic.
-        K_i_prop : array_like, 1D int
+        K_i_prop : ndarray, 1D int
             Degree sequence of post-synaptic neurons (i) of respective property.
-        K_j_prop : array_like, 1D int
+        K_j_prop : ndarray, 1D int
             Degree sequence of pre-synaptic neurons (j) of respective property.
         K_mean : float
             Mean degree of degree sequence.
@@ -282,7 +282,7 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out'):
 
         Returns
         -------
-        swap : array_like, 1D bool
+        swap : ndarray, 1D bool
             Boolean value if pair should be swapped.
         """
 
@@ -372,7 +372,7 @@ def assort_coef_from_matrix(A, i_prop='in', j_prop='out'):
 
     Parameters
     ----------
-    A : array_like, 2D int
+    A : ndarray, 2D int
         Adjacency matrix.
     i_prop : str
         Respective node degree which is involved in assortative mixing.
