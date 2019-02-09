@@ -64,24 +64,7 @@ def integrate(pm, init=None):
         Degree states at respective times.
     """
 
-    if pm.degree_approach == 'full':
-        N_state_variables = pm.N_k_in
-        Q = pm.P_k_in[None, :] * pm.a * (pm.N / pm.k_mean)
-        # Q = np.squeeze(np.tensordot(pm.P_k[..., None], pm.a,
-        #                            axes=(1, 1)))
-
-    elif pm.degree_approach == 'virtual':
-        N_state_variables = pm.N_mu_in
-        Q = pm.w_in[None, :] * pm.a_v * (pm.N / pm.k_mean)
-
-    elif pm.degree_approach == 'transform':
-        N_state_variables = pm.N_k_in
-        Q = 1 / pm.k_in_mean * pm.E
-
-    else:
-        print('\n "degree_approach" is none of the possible choices "full",'
-              '"virtual" or "transform".')
-        quit(1)
+    N_state_variables, Q = NQ_for_approach(pm)
 
     # Initialise network for t=0
     b_t = 1j * np.zeros((pm.t_steps + 1, N_state_variables))
@@ -138,3 +121,43 @@ def Gamma(n):
                           * np.math.factorial(l-m))
 
     return g
+
+
+def NQ_for_approach(pm):
+    """ In order to use the same dynamical equation the number of state
+    variables and the transition matrix need to be computed according to
+    the chosen degree_approach.
+
+    Parameters
+    ----------
+    pm : parameter.py
+        Parameter file.
+
+    Returns
+    -------
+    N_state_variables : int
+        Number of state variables.
+    Q : ndarray, 2D
+        Transition matrix - a weighted assortativity function.
+    """
+
+    if pm.degree_approach == 'full':
+        N_state_variables = pm.N_k_in
+        Q = pm.P_k_in[None, :] * pm.a * (pm.N / pm.k_mean)
+        # Q = np.squeeze(np.tensordot(pm.P_k[..., None], pm.a,
+        #                            axes=(1, 1)))
+
+    elif pm.degree_approach == 'virtual':
+        N_state_variables = pm.N_mu_in
+        Q = pm.w_in[None, :] * pm.a_v * (pm.N / pm.k_mean)
+
+    elif pm.degree_approach == 'transform':
+        N_state_variables = pm.N_k_in
+        Q = 1 / pm.k_in_mean * pm.E
+
+    else:
+        print('\n "degree_approach" is none of the possible choices',
+              pm.degree_approach_lib, '.')
+        quit(1)
+
+    return N_state_variables, Q

@@ -195,6 +195,6 @@ def a_func_linear(k_in, P_k_in, N, k_mean, r, rho):
         r_d -= r
         return r_d
 
-    c = optimize.root(r_dif, 0, method='df-sane', tol=1e-2).x
+    c = optimize.root(r_dif, 0, method='hybr', tol=1e-2).x
 
     return a(c)
