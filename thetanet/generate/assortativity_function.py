@@ -198,3 +198,71 @@ def a_func_linear(k_in, P_k_in, N, k_mean, r, rho):
     c = optimize.root(r_dif, 0, method='hybr', tol=1e-2).x
 
     return a(c)
+
+
+def rc_range(a, a_args):
+    """ Compute the valid range of assortativity parameter c to get the whole
+     range of assortativity coefficients r which are possible to reach with
+     for this network.
+
+    Parameters
+    ----------
+    a : function
+        Assortativity function. First argument needs to be c, followed by the
+        rest.
+    a_args : tuple
+        Function arguments of a, but without leading c.
+
+    Returns
+    -------
+    r_arr : ndarray, 1D float
+        Array of assortativity coefficients.
+    c_arr : ndarray, 1D float
+        Array of corresponding assortativity parameters.
+    """
+
+    k_in, P_k_in, N, k_mean, rho = a_args
+
+    def r(c):
+        return tn.generate.a_coef_from_a_func(a(c, *a_args), k_in, P_k_in, np.empty(0),
+                                              np.empty(0), N, k_mean, i_prop='in',
+                                              j_prop='in')
+
+    c_arr = [0., 1.]
+    r_arr = [r(c) for c in c_arr]
+
+    while r_arr[-1] - r_arr[-2] > 1e-4:
+        c_arr.append(0.05 * len(c_arr) / (r_arr[1] - r_arr[0]))
+        r_arr.append(r(c_arr[-1]))
+
+    c_arr = np.asarray(c_arr)
+    c_arr_neg = -1 * c_arr[1:][::-1]
+    r_arr_neg = [r(c) for c in c_arr_neg]
+
+    c_arr = np.append(c_arr_neg, c_arr)
+    r_arr = np.append(r_arr_neg, r_arr)
+    r_arr = np.asarray(r_arr)
+
+    return r_arr, c_arr
+
+
+def a_param_from_a_coef(r, r_range, c_range):
+    """ Return c value for a given r using the earlier calibrated r_range and
+    c_range.
+
+    Parameters
+    ----------
+    r : float
+        Assortativity coefficient.
+    r_range : ndarray, 1D float
+        Array of assortativity coefficients.
+    c_range : ndarray, 1D float
+        Array of corresponding assortativity parameters.
+
+    Returns
+    -------
+    c : float
+        Assortativity parameter.
+    """
+    c = np.interp(r, r_range, c_range)
+    return c

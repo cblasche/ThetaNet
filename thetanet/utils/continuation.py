@@ -27,7 +27,7 @@ def continuation(pm, init=None, init_stability=None):
 
     if pm.c_var not in pm.c_lib:
         print('Continuation can not be performed. Choose between', pm.c_lib, '.')
-        quit(1)
+        exit(1)
 
     N_state_variables, Q = tn.dynamics.degree_network.NQ_for_approach(pm)
 
@@ -36,9 +36,10 @@ def continuation(pm, init=None, init_stability=None):
     if init is None:
         init = tn.dynamics.degree_network.integrate(pm)[-1]
         init_stability = True
-    if len(init) != N_state_variables + 1:
-        print('Invalid initial conditions! Check chosen degree approach.')
-    b_x[0, :-1] = np.append(init.real, init.imag)
+    if len(init) != N_state_variables:
+        print('Invalid initial conditions! Check length of initial'
+              'condition with chosen degree approach.')
+    b_x[0, :-1] = real_stack(init)
     b_x[0, -1] = eval('pm.' + pm.c_var)
 
     # Stability information of fixed points
@@ -86,7 +87,8 @@ def continuation(pm, init=None, init_stability=None):
         else:
             null = (-1) * null_dummy
 
-    b_x_complex = np.append(comp_unit(b_x[:, :-1].T).T, b_x[:, -1][:, None], axis=1)
+    b_x_complex = np.append(comp_unit(b_x[:, :-1].T).T, b_x[:, -1][:, None],
+                            axis=1)
 
     return b_x_complex, stable
 
