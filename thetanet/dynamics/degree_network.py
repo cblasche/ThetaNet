@@ -161,3 +161,55 @@ def NQ_for_approach(pm):
         quit(1)
 
     return N_state_variables, Q
+
+
+def poincare_map(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa, return_time=False):
+    """ Perform time integration of mean field variables of neuronal network.
+
+    Parameters
+    ----------
+    pm : parameter.py
+        Parameter file.
+    init : ndarray, 1D float
+        Initial conditions.
+
+    Returns
+    -------
+    b_t : ndarray, 2D float [time, degree]
+        Degree states at respective times.
+    """
+
+    t0 = np.copy(t)
+    y0 = np.copy(y)
+
+    def f(t, y):
+        f = tn.dynamics.degree_network.dynamical_equation(t, y, Gamma, n, d_n,
+                                                          Q, eta_0, delta,
+                                                          kappa)
+        return f
+
+    def cycle_closed(t, y):
+        if t != t0:  # skip the first moment, when it is obviously 0
+            # return (y - y0)[0].real
+            return f(t, y)[0].real  # follow the limit cycle and let the section
+                                    # be its minimum.
+        else:
+            return 1
+    cycle_closed.terminal = True
+    cycle_closed.direction = 1
+
+    solver = scipy.integrate.solve_ivp(f, [t0, t0+100], y0, dense_output=True,
+                                   events=cycle_closed, rtol=1e-4, atol=1e-7)
+    t = np.asarray(solver.t_events).squeeze()
+
+    try:
+        y = solver.sol(t)
+    except ValueError:
+        print("Trajectory not crossing Poincare section! Potentially not a "
+              "periodic orbit.")
+        exit(1)
+
+    if not return_time:
+        return y
+    else:
+        return y, t

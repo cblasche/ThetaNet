@@ -1,5 +1,6 @@
 import numpy as np
 import thetanet as tn
+import time
 
 
 def continuation(pm, init=None, init_stability=None):
@@ -26,7 +27,8 @@ def continuation(pm, init=None, init_stability=None):
     """
 
     if pm.c_var not in pm.c_lib:
-        print('Continuation can not be performed. Choose between', pm.c_lib, '.')
+        print('Continuation can not be performed. Choose between', pm.c_lib,
+              '.')
         exit(1)
 
     N_state_variables, Q = tn.dynamics.degree_network.NQ_for_approach(pm)
@@ -35,6 +37,13 @@ def continuation(pm, init=None, init_stability=None):
     b_x = np.zeros((pm.c_steps + 1, 2 * N_state_variables + 1))
     if init is None:
         init = tn.dynamics.degree_network.integrate(pm)[-1]
+        # For poincare map: Integrate initial condition till poincare section
+        # is reached.
+        if pm.c_pmap:
+            init = tn.dynamics.degree_network.poincare_map(0, init, pm.Gamma,
+                                                           pm.n, pm.d_n, Q,
+                                                           pm.eta_0, pm.delta,
+                                                           pm.kappa)
         init_stability = True
     if len(init) != N_state_variables:
         print('Invalid initial conditions! Check length of initial'
@@ -54,7 +63,10 @@ def continuation(pm, init=None, init_stability=None):
     j = jacobian(dyn, b_x[0])
     null = null_vector(j)
 
+    t_start = time.time()
     for i in range(1, pm.c_steps+1):
+        process = i / pm.c_steps
+        tn.utils.progress_bar(process, time.time() - t_start)
         # Step forward along null vector
         b_x[i] = b_x[i - 1] + null * pm.c_ds
 
@@ -74,7 +86,10 @@ def continuation(pm, init=None, init_stability=None):
                 break
             if n_i == (pm.c_n - 1):
                 print("Step", i, "did not converge!")
-                quit(1)
+                if i is 1 and not pm.c_pmap:
+                    print("Check if there is a periodic orbit and if so use "
+                          "poincare map.")
+                exit(1)
 
         # Stability (larges eigenvalue less than 0)
         stable[i] = np.max(np.linalg.eig(j[:, :-1])[0].real) < 0
@@ -110,13 +125,18 @@ def init_dyn(pm):
 
     from thetanet.dynamics.degree_network import dynamical_equation \
         as dyn_equ
+    from thetanet.dynamics.degree_network import poincare_map as poi_map
 
     if pm.c_var in ['kappa', 'eta_0', 'delta']:
         def dyn(b, x):
             Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
             setattr(locals()['pm'], pm.c_var, x)
-            return dyn_equ(0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0,
-                           pm.delta, pm.kappa)
+            args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
+                    pm.kappa)
+            if pm.c_pmap:
+                return poi_map(*args)-b
+            else:
+                return dyn_equ(*args)
 
     if pm.c_var in ['rho', 'r']:
         if pm.degree_approach == 'full':
@@ -125,8 +145,12 @@ def init_dyn(pm):
                 pm.a = tn.generate.a_func_linear(pm.k_in, pm.P_k_in, pm.N,
                                                  pm.k_mean, pm.r, pm.rho)
                 Q = pm.P_k_in[None, :] * pm.a * (pm.N / pm.k_mean)
-                return dyn_equ(0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0,
-                               pm.delta, pm.kappa)
+                args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
+                        pm.kappa)
+                if pm.c_pmap:
+                    return poi_map(*args)-b
+                else:
+                    return dyn_equ(*args)
 
         elif pm.degree_approach == 'virtual':
             def dyn(b, x):
@@ -134,8 +158,12 @@ def init_dyn(pm):
                 pm.a_v = tn.generate.a_func_linear(pm.k_v_in, pm.w_in, pm.N,
                                                  pm.k_mean, pm.r, pm.rho)
                 Q = pm.w_in[None, :] * pm.a_v * (pm.N / pm.k_mean)
-                return dyn_equ(0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0,
-                               pm.delta, pm.kappa)
+                args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
+                        pm.kappa)
+                if pm.c_pmap:
+                    return poi_map(*args)-b
+                else:
+                    return dyn_equ(*args)
 
         elif pm.degree_approach == 'transform':
             print('Under development.')
@@ -145,8 +173,12 @@ def init_dyn(pm):
                 setattr(globals()['pm'], pm.c_var, x)
                 pm.E = tn.utils.svd_E(coef, x)
                 Q = 1 / pm.k_in_mean * pm.E
-                return dyn_equ(0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0,
-                               pm.delta, pm.kappa)
+                args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
+                        pm.kappa)
+                if pm.c_pmap:
+                    return poi_map(*args)-b
+                else:
+                    return dyn_equ(*args)
 
     return dyn
 
@@ -172,7 +204,7 @@ def null_vector(A):
     return null
 
 
-def partial_b(f, b_x, dh=1e-10):
+def partial_b(f, b_x, dh=1e-5):
     """ Compute partial derivative of f with respect to b.
     The states b come in real_stack version and need to be made complex first.
     The derivative is computed as a simple difference quotient.
@@ -204,13 +236,22 @@ def partial_b(f, b_x, dh=1e-10):
 
     b = comp_unit(b)
     b_h = comp_unit(b_h)
-    df_db = (f(b_h, x) - f(b, x)) / dh
+
+    # Try to process matrix at once - much faster. For poincare maps (using
+    # scipy.integrate.solve_ivp internally) this can't be done. In this case
+    # slice the matix and process column wise.
+    try:
+        df_db = (f(b_h, x) - f(b, x)) / dh
+    except ValueError:
+        df_db = 1j*np.zeros(b.shape)
+        for col in range(df_db.shape[1]):
+            df_db[:, col] = (f(b_h[:, col], x) - f(b[:, col], x)) / dh
     df_db = real_stack(df_db)
 
     return df_db
 
 
-def partial_x(f, b_x, dh=1e-10):
+def partial_x(f, b_x, dh=1e-5):
     """ Compute partial derivative of f with respect to variable x.
     The states b come in real_stack version and need to be made complex first.
     The derivative is computed as a simple difference quotient.
