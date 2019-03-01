@@ -157,7 +157,7 @@ def a_coef_from_a_func(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop='in',
     return r
 
 
-def a_func_linear(k_in, P_k_in, N, k_mean, r, rho):
+def a_func_linear(k_in, P_k_in, N, k_mean, r, rho, i_prop, j_prop):
     """ in/in-degree assortativity function.
     Based on the linear approach for neutral assortativity and extended with
     the exponent method to introduce assortativity. Since r cannot be included
@@ -177,6 +177,12 @@ def a_func_linear(k_in, P_k_in, N, k_mean, r, rho):
         Assortativity coefficient.
     rho : float
         in/out-degree correlation.
+    i_prop : str
+        Respective node degree which is involved in assortative mixing.
+        ('in' or 'out').
+    j_prop : str
+        Respective node degree which is involved in assortative mixing.
+        ('in' or 'out').
 
     Returns
     -------
@@ -184,8 +190,13 @@ def a_func_linear(k_in, P_k_in, N, k_mean, r, rho):
         Assortativity function.
     """
 
+    # Adjust the assortativity coefficient for the conditional in-in probability
+    n_out = [i_prop, j_prop].count('out')
+    r *= abs(rho) ** n_out
+
     def a(c):
-        exponent = (1 + np.outer(k_in - k_mean, k_in - k_mean) / k_mean ** 2) ** (-c)
+        exponent = (1 + np.outer(k_in - k_mean,
+                                 k_in - k_mean) / k_mean ** 2) ** (-c)
         a = np.outer(k_in / N, (k_in / k_mean) ** rho) ** exponent
         return a
 
@@ -196,8 +207,11 @@ def a_func_linear(k_in, P_k_in, N, k_mean, r, rho):
         return r_d
 
     c = optimize.root(r_dif, 0, method='hybr', tol=1e-2).x
+    a = a(c)
+    # Normalise to get correct edge density
+    a *= k_mean / N / np.dot(P_k_in, np.dot(a, P_k_in))
 
-    return a(c)
+    return a
 
 
 def rc_range(a, a_args):

@@ -163,23 +163,42 @@ def NQ_for_approach(pm):
     return N_state_variables, Q
 
 
-def poincare_map(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa, return_time=False):
-    """ Perform time integration of mean field variables of neuronal network.
+def poincare_map(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa,
+                 return_time=False):
+    """ Perform time integration to the next intersection with poincare section.
 
     Parameters
     ----------
-    pm : parameter.py
-        Parameter file.
-    init : ndarray, 1D float
-        Initial conditions.
+    t : float
+        Time.
+    y : ndarray, 1D float
+        State variable (theta).
+    Gamma: array_like, 1D float
+        Factors arising from sophisticated double sum when rewriting the pulse
+        function in sinusoidal form.
+    n : int
+        Sharpness parameter.
+    d_n : float
+        Normalisation from pulse function.
+    Q : ndarray, 2D float
+        Connectivity matrix determining in-degree/in-degree connections.
+    eta_0 : float
+        Center of Cauchy distribution of intrinsic excitabilities.
+    delta : float
+        Half width at half maximum of Cauchy distribution of intrinsic
+        excitabilities.
+    kappa : float
+        Coupling constant.
+    return_time : bool
+        Return elapsed time in addition to updated state variable.
 
     Returns
     -------
-    b_t : ndarray, 2D float [time, degree]
+    y : ndarray, 2D float [time, degree]
         Degree states at respective times.
     """
 
-    t0 = np.copy(t)
+    t0 = t
     y0 = np.copy(y)
 
     def f(t, y):
@@ -190,16 +209,15 @@ def poincare_map(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa, return_time=False)
 
     def cycle_closed(t, y):
         if t != t0:  # skip the first moment, when it is obviously 0
-            # return (y - y0)[0].real
-            return f(t, y)[0].real  # follow the limit cycle and let the section
-                                    # be its minimum.
+            return f(t, y)[0].real    # follow the limit cycle and let the
+                                      # section be its minimum.
         else:
             return 1
     cycle_closed.terminal = True
     cycle_closed.direction = 1
 
     solver = scipy.integrate.solve_ivp(f, [t0, t0+100], y0, dense_output=True,
-                                   events=cycle_closed, rtol=1e-4, atol=1e-7)
+                                   events=cycle_closed, rtol=1e-6, atol=1e-7)
     t = np.asarray(solver.t_events).squeeze()
 
     try:

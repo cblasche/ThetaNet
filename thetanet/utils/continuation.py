@@ -63,10 +63,10 @@ def continuation(pm, init=None, init_stability=None):
     j = jacobian(dyn, b_x[0])
     null = null_vector(j)
 
+    print('Network with', N_state_variables, 'degrees | Continuation of',
+          pm.c_steps, 'steps:')
     t_start = time.time()
     for i in range(1, pm.c_steps+1):
-        process = i / pm.c_steps
-        tn.utils.progress_bar(process, time.time() - t_start)
         # Step forward along null vector
         b_x[i] = b_x[i - 1] + null * pm.c_ds
 
@@ -80,14 +80,14 @@ def continuation(pm, init=None, init_stability=None):
             n_step = newton_step(j, null, db_x, x_constrain)
 
             b_x[i] = b_x[i] - n_step
-
+            print(np.abs(n_step.sum()))
             # if Newton's method is exact enough do not aim for more precision
             if np.abs(n_step.sum()) < 1e-5:
                 break
             if n_i == (pm.c_n - 1):
-                print("Step", i, "did not converge!")
+                print("\nStep", i, "did not converge!")
                 if i is 1 and not pm.c_pmap:
-                    print("Check if there is a periodic orbit and if so use "
+                    print("\nCheck if there is a periodic orbit and if so use "
                           "poincare map.")
                 exit(1)
 
@@ -101,6 +101,9 @@ def continuation(pm, init=None, init_stability=None):
             null = null_dummy
         else:
             null = (-1) * null_dummy
+
+        process = i / pm.c_steps
+        tn.utils.progress_bar(process, time.time() - t_start)
 
     b_x_complex = np.append(comp_unit(b_x[:, :-1].T).T, b_x[:, -1][:, None],
                             axis=1)
@@ -204,7 +207,7 @@ def null_vector(A):
     return null
 
 
-def partial_b(f, b_x, dh=1e-5):
+def partial_b(f, b_x, dh=1e-6):
     """ Compute partial derivative of f with respect to b.
     The states b come in real_stack version and need to be made complex first.
     The derivative is computed as a simple difference quotient.
@@ -251,7 +254,7 @@ def partial_b(f, b_x, dh=1e-5):
     return df_db
 
 
-def partial_x(f, b_x, dh=1e-5):
+def partial_x(f, b_x, dh=1e-6):
     """ Compute partial derivative of f with respect to variable x.
     The states b come in real_stack version and need to be made complex first.
     The derivative is computed as a simple difference quotient.
