@@ -8,6 +8,7 @@ First axis contains node degrees of receiving neurons and the second axis
 holds node degrees of sending neurons.
 """
 
+
 def a_func_transform(A, k_in):
     """ Create an assortativity function based on the transformation of an
     adjacency matrix A.

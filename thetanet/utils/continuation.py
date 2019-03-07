@@ -146,7 +146,7 @@ def init_dyn(pm):
             def dyn(b, x):
                 setattr(locals()['pm'], pm.c_var, x)
                 pm.a = tn.generate.a_func_linear(pm.k_in, pm.P_k_in, pm.N,
-                                                 pm.k_mean, pm.r, pm.rho)
+                                                 pm.k_mean, pm.r, pm.rho, pm.i_prop, pm.j_prop)
                 Q = pm.P_k_in[None, :] * pm.a * (pm.N / pm.k_mean)
                 args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
                         pm.kappa)
@@ -159,7 +159,7 @@ def init_dyn(pm):
             def dyn(b, x):
                 setattr(locals()['pm'], pm.c_var, x)
                 pm.a_v = tn.generate.a_func_linear(pm.k_v_in, pm.w_in, pm.N,
-                                                 pm.k_mean, pm.r, pm.rho)
+                                                 pm.k_mean, pm.r, pm.rho, pm.i_prop, pm.j_prop)
                 Q = pm.w_in[None, :] * pm.a_v * (pm.N / pm.k_mean)
                 args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
                         pm.kappa)
