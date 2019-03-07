@@ -1,6 +1,7 @@
 import numpy as np
 import thetanet as tn
 import time
+from thetanet.exceptions import *
 
 
 def continuation(pm, init=None, init_stability=None):
@@ -47,7 +48,7 @@ def continuation(pm, init=None, init_stability=None):
         init_stability = True
     if len(init) != N_state_variables:
         print('Invalid initial conditions! Check length of initial'
-              'condition with chosen degree approach.')
+              'condition and chosen degree approach.')
     b_x[0, :-1] = real_stack(init)
     b_x[0, -1] = eval('pm.' + pm.c_var)
 
@@ -59,51 +60,64 @@ def continuation(pm, init=None, init_stability=None):
     dyn = init_dyn(pm)
 
     # To get the scheme started compute an initial null vector - the direction
-    # of the first step.
+    # of the first step. This should be done such that the change in c_var is
+    # of the same sign as c_ds.
     j = jacobian(dyn, b_x[0])
     null = null_vector(j)
+    if np.sign(null[-1]) < 0:
+        null *= -1
 
     print('Network with', N_state_variables, 'degrees | Continuation of',
           pm.c_steps, 'steps:')
     t_start = time.time()
-    for i in range(1, pm.c_steps+1):
-        # Step forward along null vector
-        b_x[i] = b_x[i - 1] + null * pm.c_ds
+    try:
+        for i in range(1, pm.c_steps+1):
+            # Step forward along null vector
+            b_x[i] = b_x[i - 1] + null * pm.c_ds
 
-        # Converge back to stability with Newton scheme
-        for n_i in range(pm.c_n):
-            j = jacobian(dyn, b_x[i])
-            db_x = real_stack(dyn(comp_unit(b_x[i, :-1]), b_x[i, -1]))
-            # Constrain on x to ensure the solution stays on plane orthogonal
-            # to null vector and distance ds.
-            x_constrain = (b_x[i] - b_x[i-1]).dot(null) - pm.c_ds
-            n_step = newton_step(j, null, db_x, x_constrain)
+            # Converge back to stability with Newton scheme
+            for n_i in range(pm.c_n):
+                try:
+                    j = jacobian(dyn, b_x[i])
+                except NoPeriodicOrbitException:
+                    raise NoPeriodicOrbitException(i)
+                db_x = real_stack(dyn(comp_unit(b_x[i, :-1]), b_x[i, -1]))
+                # Constrain on x to ensure the solution stays on plane
+                # orthogonal to null vector and distance ds.
+                x_constrain = (b_x[i] - b_x[i-1]).dot(null) - pm.c_ds
+                n_step = newton_step(j, null, db_x, x_constrain)
 
-            b_x[i] = b_x[i] - n_step
-            print(np.abs(n_step.sum()))
-            # if Newton's method is exact enough do not aim for more precision
-            if np.abs(n_step.sum()) < 1e-5:
-                break
-            if n_i == (pm.c_n - 1):
-                print("\nStep", i, "did not converge!")
-                if i is 1 and not pm.c_pmap:
-                    print("\nCheck if there is a periodic orbit and if so use "
-                          "poincare map.")
-                exit(1)
+                b_x[i] = b_x[i] - n_step
 
-        # Stability (larges eigenvalue less than 0)
-        stable[i] = np.max(np.linalg.eig(j[:, :-1])[0].real) < 0
+                # if Newton's method is exact enough break
+                if np.abs(n_step).sum() < 1e-5:
+                    break
+                if n_i == (pm.c_n - 1):
+                    if i is 1 and not pm.c_pmap:
+                        print("\nCheck if there is a periodic orbit and if so"
+                              " use poincare map. (c_pmap=True)")
+                        exit(1)
+                    print("\nStep", i, "did not converge!")
+                    raise ConvergenceError(i)
 
-        # Update null vector and make sure direction is roughly the same as
-        # previous one
-        null_dummy = null_vector(j)
-        if np.dot(null_dummy, null) > 0:
-            null = null_dummy
-        else:
-            null = (-1) * null_dummy
+            # Stability (larges eigenvalue less than 0)
+            stable[i] = np.max(np.linalg.eig(j[:, :-1])[0].real) < 0
 
-        process = i / pm.c_steps
-        tn.utils.progress_bar(process, time.time() - t_start)
+            # Update null vector and make sure direction is roughly the same as
+            # previous one
+            null_dummy = null_vector(j)
+            if np.dot(null_dummy, null) > 0:
+                null = null_dummy
+            else:
+                null = (-1) * null_dummy
+
+            process = i / pm.c_steps
+            tn.utils.progress_bar(process, time.time() - t_start)
+
+    except (ConvergenceError, NoPeriodicOrbitException) as error:
+        final_step, = error.args
+        b_x = b_x[:final_step]
+        pass
 
     b_x_complex = np.append(comp_unit(b_x[:, :-1].T).T, b_x[:, -1][:, None],
                             axis=1)
@@ -146,7 +160,8 @@ def init_dyn(pm):
             def dyn(b, x):
                 setattr(locals()['pm'], pm.c_var, x)
                 pm.a = tn.generate.a_func_linear(pm.k_in, pm.P_k_in, pm.N,
-                                                 pm.k_mean, pm.r, pm.rho, pm.i_prop, pm.j_prop)
+                                                 pm.k_mean, pm.r, pm.rho,
+                                                 pm.i_prop, pm.j_prop)
                 Q = pm.P_k_in[None, :] * pm.a * (pm.N / pm.k_mean)
                 args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
                         pm.kappa)
@@ -159,7 +174,8 @@ def init_dyn(pm):
             def dyn(b, x):
                 setattr(locals()['pm'], pm.c_var, x)
                 pm.a_v = tn.generate.a_func_linear(pm.k_v_in, pm.w_in, pm.N,
-                                                 pm.k_mean, pm.r, pm.rho, pm.i_prop, pm.j_prop)
+                                                   pm.k_mean, pm.r, pm.rho,
+                                                   pm.i_prop, pm.j_prop)
                 Q = pm.w_in[None, :] * pm.a_v * (pm.N / pm.k_mean)
                 args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
                         pm.kappa)
@@ -187,7 +203,7 @@ def init_dyn(pm):
 
 
 def null_vector(A):
-    """ Compute normalised null vector to given a matrix A.
+    """ Compute normalised null vector to a given matrix A.
     The null vector fulfills A(null) = 0.
 
     Parameters

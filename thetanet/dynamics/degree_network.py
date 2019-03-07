@@ -3,6 +3,7 @@ import thetanet as tn
 import scipy.integrate
 import scipy.sparse
 from time import time
+from thetanet.exceptions import *
 
 
 def dynamical_equation(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa):
@@ -217,17 +218,17 @@ def poincare_map(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa,
     cycle_closed.direction = 1
 
     solver = scipy.integrate.solve_ivp(f, [t0, t0+100], y0, dense_output=True,
-                                   events=cycle_closed, rtol=1e-6, atol=1e-7)
+                                   events=cycle_closed, rtol=1e-7, atol=1e-7)
     t = np.asarray(solver.t_events).squeeze()
 
-    try:
+    if t:
         y = solver.sol(t)
-    except ValueError:
-        print("Trajectory not crossing Poincare section! Potentially not a "
-              "periodic orbit.")
-        exit(1)
-
-    if not return_time:
-        return y
     else:
+        print("\nTrajectory not crossing Poincare section! Potentially not a "
+              "periodic orbit.")
+        raise NoPeriodicOrbitException
+
+    if return_time:
         return y, t
+    else:
+        return y
