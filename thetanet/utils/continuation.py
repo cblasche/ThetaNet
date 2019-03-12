@@ -426,3 +426,36 @@ def nullspace(A, atol=1e-14, rtol=0):
     ns = vh[nnz:].conj().T
 
     return ns
+
+
+def pmap_periods(b_x, pm):
+    """ Compute period times of poincare maps.
+
+    Parameters
+    ----------
+    b_x : ndarray, 2D complex
+        Curve of fixed points. [Curve, States+Variable]
+    pm : parameter.py
+        Parameter file.
+
+    Returns
+    -------
+    periods : ndarray, 1D float
+        Times of how long poincare maps had to integrate.
+    """
+
+    periods = np.zeros(b_x.shape[0])
+    for i in range(b_x.shape[0]):
+        b, x = b_x[i, :-1], b_x[i, -1]
+
+        setattr(locals()['pm'], pm.c_var, x)
+        pm.a_v = tn.generate.a_func_linear(pm.k_v_in, pm.w_in, pm.N,
+                                           pm.k_mean, pm.r, pm.rho,
+                                           pm.i_prop, pm.j_prop)
+        Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
+        args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
+                pm.kappa)
+        periods[i] = tn.dynamics.degree_network.poincare_map(*args,
+                                                            return_time=True)[1]
+
+    return periods
