@@ -33,6 +33,7 @@ rho = .0  # in-out-correlation
 
 """ Assortativity
 """
+c = 0  # assortativity parameter
 r = .0  # assortativity coefficient
 i_prop = 'in'  # post-synaptic neuron property - 'in' / 'out'
 j_prop = 'in'  # pre-synaptic neuron property
@@ -42,8 +43,9 @@ j_prop = 'in'  # pre-synaptic neuron property
 """
 K_in, K_out = None, None
 A = None
-K_in, K_out = tn.generate.degree_sequence(k_in, P_k_in, k_out, P_k_out, N, rho)
-A = tn.generate.configuration_model(K_in, K_out, r, i_prop, j_prop)
+
+# K_in, K_out = tn.generate.degree_sequence(k_in, P_k_in, k_out, P_k_out, N, rho)
+# A = tn.generate.configuration_model(K_in, K_out, r, i_prop, j_prop)
 # A = tn.generate.chung_lu_model(K_in, K_out, rho, c, i_prop, j_prop)
 
 
@@ -60,7 +62,7 @@ degree_approach_lib = ['full', 'virtual', 'transform']
 degree_approach = degree_approach_lib[1]
 
 a = None
-a = tn.generate.a_func_linear(k_in, P_k_in, N, k_mean, r, rho, i_prop, j_prop)
+# a = tn.generate.a_func_linear(k_in, k_out, N, k_mean, c, i_prop, j_prop)
 
 
 """ Virtual degree network
@@ -80,7 +82,7 @@ q_v_out = tn.utils.func_v(q_out, k_out, P_k_out)
 w = np.outer(w_in, w_out)
 
 a_v = None
-a_v = tn.generate.a_func_linear(k_v_in, w_in, N, k_mean, r, rho, i_prop, j_prop)
+a_v = tn.generate.a_func_linear(k_v_in, k_v_out, N, k_mean, c, i_prop, j_prop)
 
 
 
@@ -92,8 +94,8 @@ E, B = None, None
 
 """ Neuron dynamics
 """
-kappa = -4  # influence strength of other pulses
-eta_0 = 2.6  # center of distribution
+kappa = 4  # influence strength of other pulses
+eta_0 = -2.6  # center of distribution
 delta = 0.1  # width of distribution
 eta = cauchy.rvs(eta_0, delta, size=N)  # Cauchy- aka Lorentz-distribution
 eta = np.clip(eta, eta_0 - 10, eta_0 + 10)
@@ -115,9 +117,9 @@ dt = (t_end - t_start) * 1.0 / t_steps
 
 """ Continuation
 """
-c_lib = ['kappa', 'eta_0', 'delta', 'rho', 'r']
+c_lib = ['kappa', 'eta_0', 'delta', 'rho', 'c']
 c_var = c_lib[4]
-c_ds = .04  # step size
-c_steps = 400  # number of steps
+c_ds = 0.5  # step size
+c_steps = 40  # number of steps
 c_n = 7  # number of Newton iterations
-c_pmap = True  # using poincare map of dynamical equation
+c_pmap = False  # using poincare map of dynamical equation

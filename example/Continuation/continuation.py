@@ -12,11 +12,10 @@ For a positive c_ds we will explore the space in positive direction and vice
 versa.
 """
 
-b_x, stable, periods = tn.utils.continuation(pm)
-periods = tn.utils.pmap_periods(b_x, pm)
-R = np.tensordot(pm.w_in, b_x[:, :-1], axes=(0, 1))
+bx, x, stable = tn.utils.continuation(pm)
+periods = tn.utils.pmap_period(bx, x, pm)
+R = np.tensordot(pm.w, bx, axes=((0, 1), (1, 2)))
 
-# c=-stable is only for aesthetic reasons.
 plt.figure(1)
-plt.scatter(b_x[:, -1].real, periods, c=-stable)
+plt.scatter(x, periods, c=stable)
 plt.show()

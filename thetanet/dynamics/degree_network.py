@@ -5,6 +5,11 @@ import scipy.sparse
 from time import time
 from thetanet.exceptions import *
 
+""" The in- and output of dynamical_equation and poincare_map use state
+    variables in flat form. It is possible to pass on an array of the flat
+    states.
+"""
+
 
 def dynamical_equation(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa):
     """ Mean field description of the Theta neuron model.
@@ -14,7 +19,7 @@ def dynamical_equation(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa):
     t : float
         Time.
     y : ndarray, 1D float
-        State variable (theta).
+        State variable. Length N_k_in * N_k_out in a long 1D vector.
     Gamma: array_like, 1D float
         Factors arising from sophisticated double sum when rewriting the pulse
         function in sinusoidal form.
@@ -37,15 +42,19 @@ def dynamical_equation(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa):
     dy/dt : ndarray, 1D float
         Time derivative at time t.
     """
+    y_shape = y.shape
+    y.shape = (Q.shape[0], Q.shape[1]) + y.shape[1:]
 
     P = Gamma[0]
     for p in range(1, n + 1):
         P += Gamma[p] * (y ** p + np.conjugate(y) ** p)
     P *= d_n
-    I = np.tensordot(Q, P, axes=(1, 0))  # axis 1 refers to k^\prime_in
+    I = np.tensordot(Q, P, axes=((2, 3), (0, 1)))  # axis 2/3 refers to k^\prime
     dydt = -1j * 0.5 * (y - 1) ** 2 + \
            1j * 0.5 * (y + 1) ** 2 * (eta_0 + 1j * delta + kappa * I)
 
+    y.shape = y_shape
+    dydt.shape = y_shape
     return dydt
 
 
@@ -56,12 +65,12 @@ def integrate(pm, init=None):
     ----------
     pm : parameter.py
         Parameter file.
-    init : ndarray, 1D float
+    init : ndarray, 2D complex
         Initial conditions.
 
     Returns
     -------
-    b_t : ndarray, 2D float [time, degree]
+    b_t : ndarray, 3D float [time, degree(2D)]
         Degree states at respective times.
     """
 
@@ -69,8 +78,17 @@ def integrate(pm, init=None):
 
     # Initialise network for t=0
     b_t = 1j * np.zeros((pm.t_steps + 1, N_state_variables))
+
     if init is None:
         init = 1j * np.zeros(N_state_variables)
+
+    try:
+        init.shape = N_state_variables
+    except ValueError:
+        print('\n Invalid initial conditions! Check length of initial '
+              'condition and chosen degree approach.')
+        quit()
+
     b_t[0] = init
 
     # Initialise integrator
@@ -93,6 +111,7 @@ def integrate(pm, init=None):
         step += 1
     print('    Successful. \n')
 
+    b_t.shape = (b_t.shape[0], Q.shape[0], Q.shape[1])
     return b_t
 
 
@@ -138,19 +157,17 @@ def NQ_for_approach(pm):
     -------
     N_state_variables : int
         Number of state variables.
-    Q : ndarray, 2D
+    Q : ndarray, 4D
         Transition matrix - a weighted assortativity function.
     """
 
     if pm.degree_approach == 'full':
-        N_state_variables = pm.N_k_in
-        Q = pm.P_k_in[None, :] * pm.a * (pm.N / pm.k_mean)
-        # Q = np.squeeze(np.tensordot(pm.P_k[..., None], pm.a,
-        #                            axes=(1, 1)))
+        N_state_variables = pm.N_k_in * pm.N_k_out
+        Q = pm.P_k[None, None, :, :] * pm.a * (pm.N / pm.k_mean)
 
     elif pm.degree_approach == 'virtual':
-        N_state_variables = pm.N_mu_in
-        Q = pm.w_in[None, :] * pm.a_v * (pm.N / pm.k_mean)
+        N_state_variables = pm.N_mu_in * pm.N_mu_out
+        Q = pm.w[None, None, :, :] * pm.a_v * (pm.N / pm.k_mean)
 
     elif pm.degree_approach == 'transform':
         N_state_variables = pm.N_k_in
@@ -173,7 +190,7 @@ def poincare_map(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa,
     t : float
         Time.
     y : ndarray, 1D float
-        State variable (theta).
+        State variable. (flattend)
     Gamma: array_like, 1D float
         Factors arising from sophisticated double sum when rewriting the pulse
         function in sinusoidal form.
@@ -181,7 +198,7 @@ def poincare_map(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa,
         Sharpness parameter.
     d_n : float
         Normalisation from pulse function.
-    Q : ndarray, 2D float
+    Q : ndarray, 4D float
         Connectivity matrix determining in-degree/in-degree connections.
     eta_0 : float
         Center of Cauchy distribution of intrinsic excitabilities.
@@ -196,10 +213,10 @@ def poincare_map(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa,
     Returns
     -------
     y : ndarray, 2D float [time, degree]
-        Degree states at respective times.
+        Degree states (flattend) at respective times.
     """
 
-    t0 = t
+    t0 = np.copy(t)
     y0 = np.copy(y)
 
     def f(t, y):
@@ -210,8 +227,8 @@ def poincare_map(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa,
 
     def cycle_closed(t, y):
         if t != t0:  # skip the first moment, when it is obviously 0
-            return f(t, y)[0].real    # follow the limit cycle and let the
-                                      # section be its minimum.
+            return f(t, y)[0].real  # follow the limit cycle and let the
+                                    # section be its minimum.
         else:
             return 1
     cycle_closed.terminal = True
