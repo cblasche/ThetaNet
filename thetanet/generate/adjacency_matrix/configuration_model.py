@@ -28,9 +28,9 @@ def configuration_model(K_in, K_out, r=0, i_prop='in', j_prop='out'):
         Adjacency matrix.
     """
 
-    print('Adjacency matrix - Configuration model | N =', len(K_in), '| K_in = [',
-          min(K_in), ',', max(K_in), '] | K_out = [', min(K_out), ',',
-          max(K_out), '] | r =', r)
+    print('Adjacency matrix - Configuration model | N =', len(K_in),
+          '| K_in = [', min(K_in), ',', max(K_in), '] | K_out = [', min(K_out),
+          ',', max(K_out), '] | r =', r)
 
     print('\r    Edge list:', end=' ')
     edges = edges_from_sequence(K_in, K_out)
@@ -207,7 +207,8 @@ def remove_multi_edges(A):
     unique_edges = np.unique(edges, axis=0)
     num_unique_edges = len(unique_edges)
     num_multi_edges = np.sum(A) - num_unique_edges
-    edges = np.append(unique_edges, np.zeros((num_multi_edges, 2), dtype=int), axis=0)
+    edges = np.append(unique_edges, np.zeros((num_multi_edges, 2), dtype=int),
+                      axis=0)
     multi_edges = np.argwhere(A > 1)
 
     # loop through multi-edges
@@ -297,7 +298,8 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out'):
             criteria_cor = (cor_swap < cor_original)
 
         # Criteria: avoid multi-edges directly when adding 1 to certain entries
-        criteria_multi = np.logical_and((A[J[0], I[1]] == 0), (A[I[0], J[1]] == 0))
+        criteria_multi = np.logical_and((A[J[0], I[1]] == 0),
+                                        (A[I[0], J[1]] == 0))
 
         # Criteria: avoid self-edges when adding 1 to the diagonal
         criteria_self = np.logical_and((I[0] != J[1]), (J[0] != I[1]))
@@ -361,7 +363,8 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out'):
             print('\r      Iteration', iteration, ': r_diff =', r_diff)
         else:
             limited_edges = int(limited_edges * 0.3)
-            print('\r      Iteration', iteration, ': Step size has been reduced.')
+            print('\r      Iteration', iteration,
+                  ': Step size has been reduced.')
 
     return
 
@@ -395,7 +398,7 @@ def assort_coef_from_matrix(A, i_prop='in', j_prop='out'):
     N = len(K_in)
     K_mean = K_in.mean()
 
-    j, i = np.meshgrid(range(N), range(N))  # order j, i is correct
+    i, j = np.meshgrid(range(N), range(N), indexing='ij')
     var_i_prop = np.sum(A * (K_i_prop[i] - K_mean) ** 2)
     var_j_prop = np.sum(A * (K_j_prop[j] - K_mean) ** 2)
     cor = np.sum(A * (K_i_prop[i] - K_mean) * (K_j_prop[j] - K_mean))
