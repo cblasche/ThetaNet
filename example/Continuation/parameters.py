@@ -33,6 +33,7 @@ rho = .0  # in-out-correlation
 
 """ Assortativity
 """
+c = 0
 r = .0  # assortativity coefficient
 i_prop = 'in'  # post-synaptic neuron property - 'in' / 'out'
 j_prop = 'in'  # pre-synaptic neuron property
@@ -66,7 +67,7 @@ a = None
 # one needs N_mu+1 polynomials q. The degree probability P_k transforms into
 # N_mu weights w for the virtual degrees.
 
-N_mu_in = 15
+N_mu_in = 10
 k_v_in, w_in, q_in = tn.utils.three_term_recursion(N_mu_in, k_in, P_k_in)
 q_v_in = tn.utils.func_v(q_in, k_in, P_k_in)
 
@@ -77,7 +78,7 @@ q_v_out = tn.utils.func_v(q_out, k_out, P_k_out)
 w = np.outer(w_in, w_out)
 
 a_v = None
-a_v = tn.generate.a_func_linear(k_v_in, w_in, N, k_mean, r, rho, i_prop, j_prop)
+a_v = tn.generate.a_func_linear(k_v_in, k_v_out, N, k_mean, c, i_prop, j_prop)
 
 """ Transform degree network
 """
@@ -110,9 +111,9 @@ dt = (t_end - t_start) * 1.0 / t_steps
 
 """ Continuation
 """
-c_lib = ['kappa', 'eta_0', 'delta', 'rho', 'r']
+c_lib = ['kappa', 'eta_0', 'delta', 'rho', 'c']
 c_var = c_lib[4]
-c_ds = .04  # step size
-c_steps = 10  # number of steps
+c_ds = 0.7  # step size
+c_steps = 1  # number of steps
 c_n = 7  # number of Newton iterations
 c_pmap = True  # using poincare map of dynamical equation

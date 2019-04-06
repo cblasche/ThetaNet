@@ -4,7 +4,7 @@ import thetanet as tn
 
 """
 For assortativity functions we follow the convention of adjacency matrices:
-First axis contains node degrees of receiving neurons and the second axis
+First two axes contain node degrees of receiving neurons and the second axis
 holds node degrees of sending neurons.
 """
 
@@ -52,8 +52,7 @@ def a_func_transform(A, k_in):
     return E, B
 
 
-def a_func_empirical(A, k_in, P_k_in, k_out, P_k_out, i_prop='in',
-                     j_prop='out'):
+def a_func_empirical2D(A, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
     """ Create an assortativity function based on counting connections of an
     adjacency matrix.
 
@@ -108,9 +107,9 @@ def a_func_empirical(A, k_in, P_k_in, k_out, P_k_out, i_prop='in',
     return a
 
 
-def a_coef_from_a_func(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop='in',
-                       j_prop='out'):
-    """ Compute the assortativity coefficient from an assortativity function.
+def a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop,
+                         j_prop):
+    """ Compute the assortativity coefficient from a 2D assortativity function.
     Reconstruct 'count_func' one would gain from the adjacency matrix first and
     then compute correlation.
 
@@ -149,35 +148,37 @@ def a_coef_from_a_func(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop='in',
     P_k_j = eval('P_k_' + j_prop)
 
     count_func = a * np.outer(P_k_i, P_k_j) * N ** 2
-    mesh_k_i, mesh_k_j = np.meshgrid(k_i, k_j)
+    mesh_k_i, mesh_k_j = np.meshgrid(k_i, k_j, indexing='ij')
     cor = np.sum((mesh_k_i - k_mean) * (mesh_k_j - k_mean) * count_func)
-    std_j = np.sqrt(np.sum((mesh_k_i - k_mean) ** 2 * count_func))
-    std_i = np.sqrt(np.sum((mesh_k_j - k_mean) ** 2 * count_func))
+    std_i = np.sqrt(np.sum((mesh_k_i - k_mean) ** 2 * count_func))
+    std_j = np.sqrt(np.sum((mesh_k_j - k_mean) ** 2 * count_func))
     r = cor / std_i / std_j
 
     return r
 
 
-def a_func_linear(k_in, P_k_in, N, k_mean, r, rho, i_prop, j_prop):
-    """ in/in-degree assortativity function.
-    Based on the linear approach for neutral assortativity and extended with
-    the exponent method to introduce assortativity. Since r cannot be included
-    directly one has to numerically find the parameter to tune assortativity.
+def a_coef_from_a_func(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop,
+                       j_prop):
+    """ Compute the assortativity coefficient from a 4D assortativity function.
+    Reconstruct 'count_func' one would gain from the adjacency matrix first and
+    then compute correlation.
 
     Parameters
     ----------
+    a : ndarray, 4D float
+        Assortativity function.
     k_in : ndarray, 1D int
         In-degree space.
     P_k_in : ndarray, 1D float
         In-degree probability.
+    k_out : ndarray, 1D int
+        Out-degree space.
+    P_k_out : ndarray, 1D float
+        Out-degree probability.
     N : int
         Number of neurons.
     k_mean : float
         Mean degree.
-    r : float
-        Assortativity coefficient.
-    rho : float
-        in/out-degree correlation.
     i_prop : str
         Respective node degree which is involved in assortative mixing.
         ('in' or 'out').
@@ -187,35 +188,81 @@ def a_func_linear(k_in, P_k_in, N, k_mean, r, rho, i_prop, j_prop):
 
     Returns
     -------
-    a : ndarray, 2D float
-        Assortativity function.
+    r : float
+        Assortativity coefficient.
     """
 
-    # Adjust the assortativity coefficient for the conditional in-in probability
-    n_out = [i_prop, j_prop].count('out')
-    r *= abs(rho) ** n_out
+    i_mean_axis = {'in': 1, 'out': 0}
+    j_mean_axis = {'in': 3, 'out': 2}
 
-    def a(c):
-        exponent = (1 + np.outer(k_in - k_mean,
-                                 k_in - k_mean) / k_mean ** 2) ** (-c)
-        a = np.outer(k_in / N, (k_in / k_mean) ** rho) ** exponent
-        return a
+    a = a.sum(axis=(i_mean_axis[i_prop], j_mean_axis[j_prop]))
 
-    def r_dif(c):
-        r_d = a_coef_from_a_func(a(c), k_in, P_k_in, np.empty(0), np.empty(0),
-                                 N, k_mean, i_prop='in', j_prop='in')
-        r_d -= r
-        return r_d
+    r = a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop,
+                             j_prop)
 
-    c = optimize.root(r_dif, 0, method='hybr', tol=1e-2).x
-    a = a(c)
-    # Normalise to get correct edge density
-    a *= k_mean / N / np.dot(P_k_in, np.dot(a, P_k_in))
+    return r
+
+
+def a_func_linear(k_in, k_out, N, k_mean, c, i_prop, j_prop):
+    """ Assortativity function.
+    Based on the linear approach for neutral assortativity and extended with
+    the exponent method to introduce assortativity. Since r cannot be included
+    directly one has to numerically find the parameter to tune assortativity.
+
+    Parameters
+    ----------
+    k_in : ndarray, 1D int
+        In-degree space.
+    k_out : ndarray, 1D float
+        Out-degree probability.
+    N : int
+        Number of neurons.
+    k_mean : float
+        Mean degree.
+    c : float
+        Assortativity parameter.
+    i_prop : str
+        Respective node degree which is involved in assortative mixing.
+        ('in' or 'out').
+    j_prop : str
+        Respective node degree which is involved in assortative mixing.
+        ('in' or 'out').
+
+    Returns
+    -------
+    a : ndarray, 4D float
+        Assortativity function.
+    """
+    if i_prop == 'in':
+        i_prop_axis = 0
+    elif i_prop == 'out':
+        i_prop_axis = 1
+    if j_prop == 'in':
+        j_prop_axis = 2
+    elif j_prop == 'out':
+        j_prop_axis = 3
+
+    i_dim_array = np.ones(4, int)
+    i_dim_array[i_prop_axis] = -1
+    j_dim_array = np.ones(4, int)
+    j_dim_array[j_prop_axis] = -1
+
+    k_i = eval('k_' + i_prop).reshape(i_dim_array)
+    k_j = eval('k_' + j_prop).reshape(j_dim_array)
+
+    a = k_in[:, None, None, None] * \
+        np.ones(len(k_out))[None, :, None, None] * \
+        np.ones(len(k_in))[None, None, :, None] * \
+        k_out[None, None, None, :]
+
+    a += c * (k_j - k_mean) * (k_i - k_mean)
+    a /= N * k_mean
+    a = np.clip(a, 0, 1)
 
     return a
 
 
-def rc_range(a, a_args):
+def rc_range(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop, j_prop):
     """ Compute the valid range of assortativity parameter c to get the whole
      range of assortativity coefficients r which are possible to reach with
      for this network.
@@ -223,10 +270,9 @@ def rc_range(a, a_args):
     Parameters
     ----------
     a : function
-        Assortativity function. First argument needs to be c, followed by the
-        rest.
+        Assortativity function.
     a_args : tuple
-        Function arguments of a, but without leading c.
+        Function arguments of a. Note c will not matter.
 
     Returns
     -------
@@ -236,12 +282,11 @@ def rc_range(a, a_args):
         Array of corresponding assortativity parameters.
     """
 
-    k_in, P_k_in, N, k_mean, rho = a_args
-
     def r(c):
-        return tn.generate.a_coef_from_a_func(a(c, *a_args), k_in, P_k_in, np.empty(0),
-                                              np.empty(0), N, k_mean, i_prop='in',
-                                              j_prop='in')
+        return tn.generate.a_coef_from_a_func(a(k_in, k_out, N, k_mean, c,
+                                                i_prop, j_prop), k_in, P_k_in,
+                                              k_out, P_k_out, N, k_mean,
+                                              i_prop, j_prop)
 
     c_arr = [0., 1.]
     r_arr = [r(c) for c in c_arr]

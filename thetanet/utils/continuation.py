@@ -4,7 +4,7 @@ import time
 from thetanet.exceptions import *
 
 
-def continuation(pm, init=None, init_stability=None):
+def continuation(pm, init_b=None, init_x=None, init_stability=None):
     """ Continuation scheme.
     Trace out a curve stable or unstable fixed points by continuing an initial
     solution under variation of the chosen variable pm.c_var.
@@ -13,22 +13,26 @@ def continuation(pm, init=None, init_stability=None):
     ----------
     pm : parameter.py
         Parameter file.
-    init : ndarray, 1D float
+    init_b : ndarray, 2D float
         Initial conditions for states followed by continuation variable.
+    init_x : float
+        Initial condition for continuation parameter.
     init_stability: bool
         True if fixed point is stable, False if not.
 
 
     Returns
     -------
-    b_x : ndarray, 2D complex
-        Curve of fixed points. [Curve, States+Variable]
+    b : ndarray, 3D complex
+        Curve of fixed points. [Curve progress, states(2D)]
+    x : ndarray, 1D float
+        Curve of continuation parameters.
     stable : ndarray, 1D bool
-        Stability information of the respective point in b_x.
+        Curve of stability information of the respective point in b and x.
     """
 
     if pm.c_var not in pm.c_lib:
-        print('Continuation can not be performed. Choose between', pm.c_lib,
+        print('\n "c_var" is none of the possible choices', pm.c_lib,
               '.')
         exit(1)
 
@@ -36,21 +40,29 @@ def continuation(pm, init=None, init_stability=None):
 
     # Initialise continuation
     b_x = np.zeros((pm.c_steps + 1, 2 * N_state_variables + 1))
-    if init is None:
-        init = tn.dynamics.degree_network.integrate(pm)[-1]
+
+    if init_b is None:
+        init_b = tn.dynamics.degree_network.integrate(pm)[-1]
+        init_b.shape = N_state_variables
         # For poincare map: Integrate initial condition till poincare section
         # is reached.
         if pm.c_pmap:
-            init = tn.dynamics.degree_network.poincare_map(0, init, pm.Gamma,
-                                                           pm.n, pm.d_n, Q,
-                                                           pm.eta_0, pm.delta,
-                                                           pm.kappa)
+            init_b = tn.dynamics.degree_network.poincare_map(0, init_b, pm.Gamma,
+                                                             pm.n, pm.d_n, Q,
+                                                             pm.eta_0, pm.delta,
+                                                             pm.kappa)
+        init_x = eval('pm.' + pm.c_var)
         init_stability = True
-    if len(init) != N_state_variables:
-        print('Invalid initial conditions! Check length of initial'
+
+    try:
+        init_b.shape = N_state_variables
+    except ValueError:
+        print('\n Invalid initial conditions! Check length of initial '
               'condition and chosen degree approach.')
-    b_x[0, :-1] = real_stack(init)
-    b_x[0, -1] = eval('pm.' + pm.c_var)
+        quit()
+
+    b_x[0, :-1] = real_stack(init_b)
+    b_x[0, -1] = init_x
 
     # Stability information of fixed points
     stable = np.zeros(pm.c_steps + 1)
@@ -100,6 +112,12 @@ def continuation(pm, init=None, init_stability=None):
                     print("\nStep", i, "did not converge!")
                     raise ConvergenceError(i)
 
+            # Adaptive step size - depending on speed of convergence
+            if n_i < 2:
+                pm.c_ds *= 1.5
+            if n_i > 3:
+                pm.c_ds /= 1.5
+
             # Stability (larges eigenvalue less than 0)
             stable[i] = np.max(np.linalg.eig(j[:, :-1])[0].real) < 0
 
@@ -117,12 +135,14 @@ def continuation(pm, init=None, init_stability=None):
     except (ConvergenceError, NoPeriodicOrbitException) as error:
         final_step, = error.args
         b_x = b_x[:final_step]
+        stable = stable[:final_step]
         pass
 
-    b_x_complex = np.append(comp_unit(b_x[:, :-1].T).T, b_x[:, -1][:, None],
-                            axis=1)
+    b = comp_unit(b_x[:, :-1].T).T
+    b.shape = (b.shape[0], Q.shape[0], Q.shape[1])
+    x = b_x[:, -1]
 
-    return b_x_complex, stable
+    return b, x, stable
 
 
 def init_dyn(pm):
@@ -155,14 +175,14 @@ def init_dyn(pm):
             else:
                 return dyn_equ(*args)
 
-    if pm.c_var in ['rho', 'r']:
+    if pm.c_var in ['rho', 'c']:
         if pm.degree_approach == 'full':
             def dyn(b, x):
                 setattr(locals()['pm'], pm.c_var, x)
-                pm.a = tn.generate.a_func_linear(pm.k_in, pm.P_k_in, pm.N,
-                                                 pm.k_mean, pm.r, pm.rho,
+                pm.a = tn.generate.a_func_linear(pm.k_in, pm.k_out, pm.N,
+                                                 pm.k_mean, pm.c,
                                                  pm.i_prop, pm.j_prop)
-                Q = pm.P_k_in[None, :] * pm.a * (pm.N / pm.k_mean)
+                Q = pm.P_k[None, None, :, :] * pm.a * (pm.N / pm.k_mean)
                 args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
                         pm.kappa)
                 if pm.c_pmap:
@@ -173,25 +193,10 @@ def init_dyn(pm):
         elif pm.degree_approach == 'virtual':
             def dyn(b, x):
                 setattr(locals()['pm'], pm.c_var, x)
-                pm.a_v = tn.generate.a_func_linear(pm.k_v_in, pm.w_in, pm.N,
-                                                   pm.k_mean, pm.r, pm.rho,
+                pm.a_v = tn.generate.a_func_linear(pm.k_v_in, pm.k_v_out, pm.N,
+                                                   pm.k_mean, pm.c,
                                                    pm.i_prop, pm.j_prop)
-                Q = pm.w_in[None, :] * pm.a_v * (pm.N / pm.k_mean)
-                args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
-                        pm.kappa)
-                if pm.c_pmap:
-                    return poi_map(*args)-b
-                else:
-                    return dyn_equ(*args)
-
-        elif pm.degree_approach == 'transform':
-            print('Under development.')
-            quit(1)
-            def dyn(b, x):
-                coef = eval('pm.coef_' + pm.c_var)
-                setattr(globals()['pm'], pm.c_var, x)
-                pm.E = tn.utils.svd_E(coef, x)
-                Q = 1 / pm.k_in_mean * pm.E
+                Q = pm.w[None, None, :, :] * pm.a_v * (pm.N / pm.k_mean)
                 args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
                         pm.kappa)
                 if pm.c_pmap:
@@ -253,18 +258,21 @@ def partial_b(f, b_x, dh=1e-6):
     h = np.diag(np.full(b.shape[0], dh))
     b_h = b + h
 
-    b = comp_unit(b)
+    b = comp_unit(b[:, 0])
     b_h = comp_unit(b_h)
 
     # Try to process matrix at once - much faster. For poincare maps (using
     # scipy.integrate.solve_ivp internally) this can't be done. In this case
-    # slice the matix and process column wise.
+    # slice the matrix and process column wise.
+    fb = f(b, x)[:, None] * np.ones(b_h.shape)
     try:
-        df_db = (f(b_h, x) - f(b, x)) / dh
+        df_db = (f(b_h, x) - fb) / dh
+        print('\n atempt')
     except ValueError:
-        df_db = 1j*np.zeros(b.shape)
+        print('\n loop')
+        df_db = 1j*np.zeros(b_h.shape)
         for col in range(df_db.shape[1]):
-            df_db[:, col] = (f(b_h[:, col], x) - f(b[:, col], x)) / dh
+            df_db[:, col] = (f(b_h[:, col], x) - fb[:, col]) / dh
     df_db = real_stack(df_db)
 
     return df_db
@@ -362,11 +370,11 @@ def real_stack(x):
 
     Parameters
     ----------
-    x : array_like, complex
+    x : ndarray, complex
 
     Returns
     -------
-    x : array_like, real
+    x : ndarray, real
     """
     return np.append(x.real, x.imag, axis=0)
 
@@ -377,11 +385,11 @@ def comp_unit(x):
 
     Parameters
     ----------
-    x : array_like, real
+    x : ndarray, real
 
     Returns
     -------
-    x : array_like, complex
+    x : ndarray, complex
     """
     return x[:int(x.shape[0]/2)] + 1j * x[int(x.shape[0]/2):]
 
@@ -428,13 +436,14 @@ def nullspace(A, atol=1e-14, rtol=0):
     return ns
 
 
-def pmap_periods(b_x, pm):
+def pmap_period(b, x, pm):
     """ Compute period times of poincare maps.
 
     Parameters
     ----------
-    b_x : ndarray, 2D complex
-        Curve of fixed points. [Curve, States+Variable]
+    b : ndarray, 3D complex
+        Curve of fixed points. [Curve, States(2D]
+    x : ndarray, 1D float
     pm : parameter.py
         Parameter file.
 
@@ -444,18 +453,16 @@ def pmap_periods(b_x, pm):
         Times of how long poincare maps had to integrate.
     """
 
-    periods = np.zeros(b_x.shape[0])
-    for i in range(b_x.shape[0]):
-        b, x = b_x[i, :-1], b_x[i, -1]
-
-        setattr(locals()['pm'], pm.c_var, x)
-        pm.a_v = tn.generate.a_func_linear(pm.k_v_in, pm.w_in, pm.N,
-                                           pm.k_mean, pm.r, pm.rho,
+    periods = np.zeros(x.shape)
+    for i in range(x.shape[0]):
+        setattr(locals()['pm'], pm.c_var, x[i])
+        pm.a_v = tn.generate.a_func_linear(pm.k_v_in, pm.k_v_out, pm.N,
+                                           pm.k_mean, pm.c,
                                            pm.i_prop, pm.j_prop)
         Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
-        args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
+        args = (0, b[i].ravel(), pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
                 pm.kappa)
-        periods[i] = tn.dynamics.degree_network.poincare_map(*args,
-                                                            return_time=True)[1]
+        periods[i] = tn.dynamics.degree_network.\
+            poincare_map(*args, return_time=True)[1]
 
     return periods
