@@ -157,7 +157,7 @@ def assortative_mixing_float(T, r, i_prop='in', j_prop='out'):
 
     K_mean = K_in.mean()
 
-    r_diff = r - tn.generate.assort_coef_from_matrix(T, i_prop, j_prop)
+    r_diff = r - tn.generate.a_coef_from_matrix(T, i_prop, j_prop)
     N = len(K_in)
     N_quadruple = int(N / 4)
     while abs(r_diff) > 0.01:
@@ -188,7 +188,7 @@ def assortative_mixing_float(T, r, i_prop='in', j_prop='out'):
             T[J_i, J_j] -= (pos_ex * 2 - 1) * ex_val
             T[J_i, I_j] += (pos_ex * 2 - 1) * ex_val
             T[I_i, J_j] += (pos_ex * 2 - 1) * ex_val
-        r_diff = r - tn.generate.assort_coef_from_matrix(T, i_prop, j_prop)
+        r_diff = r - tn.generate.a_coef_from_matrix(T, i_prop, j_prop)
         print('r_diff', r_diff)
 
     return

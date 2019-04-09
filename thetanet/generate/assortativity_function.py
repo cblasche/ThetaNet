@@ -107,8 +107,7 @@ def a_func_empirical2D(A, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
     return a
 
 
-def a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop,
-                         j_prop):
+def a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
     """ Compute the assortativity coefficient from a 2D assortativity function.
     Reconstruct 'count_func' one would gain from the adjacency matrix first and
     then compute correlation.
@@ -125,10 +124,6 @@ def a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop,
         Out-degree space.
     P_k_out : ndarray, 1D float
         Out-degree probability.
-    N : int
-        Number of neurons.
-    k_mean : float
-        Mean degree.
     i_prop : str
         Respective node degree which is involved in assortative mixing.
         ('in' or 'out').
@@ -147,7 +142,9 @@ def a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop,
     P_k_i = eval('P_k_' + i_prop)
     P_k_j = eval('P_k_' + j_prop)
 
-    count_func = a * np.outer(P_k_i, P_k_j) * N ** 2
+    k_mean = (P_k_in * k_in).sum()
+
+    count_func = a * np.outer(P_k_i, P_k_j)
     mesh_k_i, mesh_k_j = np.meshgrid(k_i, k_j, indexing='ij')
     cor = np.sum((mesh_k_i - k_mean) * (mesh_k_j - k_mean) * count_func)
     std_i = np.sqrt(np.sum((mesh_k_i - k_mean) ** 2 * count_func))
@@ -157,8 +154,7 @@ def a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop,
     return r
 
 
-def a_coef_from_a_func(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop,
-                       j_prop):
+def a_coef_from_a_func(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
     """ Compute the assortativity coefficient from a 4D assortativity function.
     Reconstruct 'count_func' one would gain from the adjacency matrix first and
     then compute correlation.
@@ -175,10 +171,6 @@ def a_coef_from_a_func(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop,
         Out-degree space.
     P_k_out : ndarray, 1D float
         Out-degree probability.
-    N : int
-        Number of neurons.
-    k_mean : float
-        Mean degree.
     i_prop : str
         Respective node degree which is involved in assortative mixing.
         ('in' or 'out').
@@ -197,8 +189,7 @@ def a_coef_from_a_func(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop,
 
     a = a.sum(axis=(i_mean_axis[i_prop], j_mean_axis[j_prop]))
 
-    r = a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop,
-                             j_prop)
+    r = a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop)
 
     return r
 
@@ -271,8 +262,25 @@ def rc_range(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop, j_prop):
     ----------
     a : function
         Assortativity function.
-    a_args : tuple
-        Function arguments of a. Note c will not matter.
+    k_in : ndarray, 1D int
+        In-degree space.
+    P_k_in : ndarray, 1D float
+        In-degree probability.
+    k_out : ndarray, 1D int
+        Out-degree space.
+    P_k_out : ndarray, 1D float
+        Out-degree probability.
+    N : int
+        Number of neurons.
+    k_mean : float
+        Mean degree.
+    i_prop : str
+        Respective node degree which is involved in assortative mixing.
+        ('in' or 'out').
+    j_prop : str
+        Respective node degree which is involved in assortative mixing.
+        ('in' or 'out').
+
 
     Returns
     -------
@@ -285,8 +293,7 @@ def rc_range(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop, j_prop):
     def r(c):
         return tn.generate.a_coef_from_a_func(a(k_in, k_out, N, k_mean, c,
                                                 i_prop, j_prop), k_in, P_k_in,
-                                              k_out, P_k_out, N, k_mean,
-                                              i_prop, j_prop)
+                                              k_out, P_k_out, i_prop, j_prop)
 
     c_arr = [0., 1.]
     r_arr = [r(c) for c in c_arr]

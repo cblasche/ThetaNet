@@ -333,7 +333,7 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out'):
     K_j_prop = eval('K_' + j_prop)
 
     # Converge to desired assortativity
-    r_diff = r - assort_coef_from_matrix(A, i_prop, j_prop)
+    r_diff = r - a_coef_from_matrix(A, i_prop, j_prop)
     iteration = 0
     limited_edges = int(A.sum())    # start with considering all edges
     while abs(r_diff) > 0.01:
@@ -351,25 +351,30 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out'):
             print('Desired assortativity coefficient r=', r, 'is impossible ',
                   'to reach for this network configuration.')
             return
+
         # New assortativity coefficient can be too extreme and needs to be
         # checked with a dummy therefore.
         A_dummy = np.copy(A)
         reconnect_edge_pair(A_dummy, I[:, swap], J[:, swap])
         remove_multi_edges(A_dummy)
-        r_diff_dummy = r - assort_coef_from_matrix(A_dummy, i_prop, j_prop)
+        r_diff_dummy = r - a_coef_from_matrix(A_dummy, i_prop, j_prop)
         if abs(r_diff_dummy) < abs(r_diff):
             A[...] = A_dummy[...]
             r_diff = r_diff_dummy
             print('\r      Iteration', iteration, ': r_diff =', r_diff)
         else:
             limited_edges = int(limited_edges * 0.3)
-            print('\r      Iteration', iteration,
-                  ': Step size has been reduced.')
+            # swap[-limited_edges:] = False
+            # reconnect_edge_pair(A, I[:, swap], J[:, swap])
+            # remove_multi_edges(A)
+            # r_diff = r - assort_coef_from_matrix(A, i_prop, j_prop)
+            print('\r      Iteration', iteration, ': r_diff =', r_diff,
+                  '(Step size has been reduced.)')
 
     return
 
 
-def assort_coef_from_matrix(A, i_prop='in', j_prop='out'):
+def a_coef_from_matrix(A, i_prop='in', j_prop='out'):
     """ Compute the assortativity coefficient with respect to chosen
     properties. Connections are from neuron j to i.
 

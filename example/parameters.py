@@ -34,7 +34,7 @@ rho = .0  # in-out-correlation
 """ Assortativity
 """
 c = 0  # assortativity parameter
-r = .0  # assortativity coefficient
+r = .2  # assortativity coefficient
 i_prop = 'in'  # post-synaptic neuron property - 'in' / 'out'
 j_prop = 'in'  # pre-synaptic neuron property
 
