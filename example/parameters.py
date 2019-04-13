@@ -34,7 +34,7 @@ rho = .0  # in-out-correlation
 """ Assortativity
 """
 c = 0  # assortativity parameter
-r = .2  # assortativity coefficient
+r = 0  # assortativity coefficient
 i_prop = 'in'  # post-synaptic neuron property - 'in' / 'out'
 j_prop = 'in'  # pre-synaptic neuron property
 
@@ -44,9 +44,9 @@ j_prop = 'in'  # pre-synaptic neuron property
 K_in, K_out = None, None
 A = None
 
-# K_in, K_out = tn.generate.degree_sequence(k_in, P_k_in, k_out, P_k_out, N, rho)
+K_in, K_out = tn.generate.degree_sequence(k_in, P_k_in, k_out, P_k_out, N, rho)
 # A = tn.generate.configuration_model(K_in, K_out, r, i_prop, j_prop)
-# A = tn.generate.chung_lu_model(K_in, K_out, rho, c, i_prop, j_prop)
+A = tn.generate.chung_lu_model(K_in, K_out, rho, c, i_prop, j_prop)
 
 
 """ Degree network
@@ -94,7 +94,7 @@ E, B = None, None
 
 """ Neuron dynamics
 """
-kappa = 4  # influence strength of other pulses
+kappa = 4.5  # influence strength of other pulses
 eta_0 = -2.6  # center of distribution
 delta = 0.1  # width of distribution
 eta = cauchy.rvs(eta_0, delta, size=N)  # Cauchy- aka Lorentz-distribution
@@ -109,8 +109,8 @@ Gamma = tn.dynamics.degree_network.Gamma(n)     # coefficients for synaptic
 """ Time
 """
 t_start = 0
-t_end = 100
-t_steps = 1000  # write out steps from evolution (not related to precision!)
+t_end = 10
+t_steps = 100  # write out steps from evolution (not related to precision!)
 t = np.linspace(t_start, t_end, t_steps + 1)
 dt = (t_end - t_start) * 1.0 / t_steps
 

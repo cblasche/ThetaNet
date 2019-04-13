@@ -99,7 +99,7 @@ def degree_sequence_double(k_in, P_k_in, k_out, P_k_out, N):
         i += 1
         K_out = degree_sequence_single(k_out, P_k_out, N)
         d = abs(K_in.sum() - K_out.sum())
-        if d < 0.05 * N:  # as soon as d is small
+        if d < 0.01 * N:  # as soon as d is small
             match_degree_sequences(k_in, K_in, k_out, K_out)
             break
     print('    Found matching out-sequence after', i,

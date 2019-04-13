@@ -88,15 +88,16 @@ def bivar_pdf(pdf_y, pdf_z, rho_gauss):
     mean = 0
     var = 1
     covar = rho_gauss
-    b = 3*np.sqrt(var)  # Domain boundary till where normal pdf will be computed
-    x = np.linspace(-b+mean, b+mean, 100)
+    b = 8*np.sqrt(var)  # Domain boundary till where normal pdf will be computed
+    x = np.linspace(-b+mean, b+mean, 500)
     x0, x1 = np.meshgrid(x, x)
     xx = np.stack([x0, x1], axis=2)
 
     # Pdf of bi-variate normal distribution
     pdf_x_2D = multivariate_normal([mean, mean],
                                    [[var, covar], [covar, var]]).pdf(xx)
-    pdf_x = pdf_x_2D.sum(1) / pdf_x_2D.sum()
+    pdf_x_2D /= pdf_x_2D.sum()
+    pdf_x = pdf_x_2D.sum(1)
 
     # Cdf of bi-variate normal distribution
     cdf_x_2D = pdf_x_2D.cumsum(0).cumsum(1)

@@ -1,7 +1,7 @@
 import numpy as np
 import thetanet as tn
 import scipy.integrate
-import scipy.sparse
+from scipy import sparse
 from time import time
 
 
@@ -34,18 +34,18 @@ def dynamical_equation(t, y, d_n, n, kappa, k_in_mean, A, eta):
     """
 
     P = d_n * (1-np.cos(y))**n
-    I = np.dot(A, P) / k_in_mean
+    I = A.dot(P) / k_in_mean
     dydt = 1-np.cos(y) + (1+np.cos(y))*(eta+kappa*I)
 
     return dydt
 
 
-def integrate(params, init=None):
+def integrate(pm, init=None):
     """ Perform time integration of neuronal network.
 
     Parameters
     ----------
-    params : parameter.py
+    pm : parameter.py
         Parameter file.
     init : ndarray, 1D float
         Initial conditions.
@@ -57,28 +57,32 @@ def integrate(params, init=None):
     """
 
     # Initialise network for t=0
-    theta_t = np.zeros((params.t_steps + 1, params.N))
+    theta_t = np.zeros((pm.t_steps + 1, pm.N))
     # If init is not specified, choose uniform distribution.
     if init is None:
-        init = np.linspace(0, 2 * np.pi * (1 - 1 / float(params.N)), params.N)
+        init = np.linspace(0, 2 * np.pi * (1 - 1 / float(pm.N)), pm.N)
     theta_t[0] = init
 
     # Initialise integrator
     network = scipy.integrate.ode(dynamical_equation)
     network.set_integrator('dopri5')
-    network.set_initial_value(theta_t[0], params.t_start)
-    network.set_f_params(params.d_n, params.n, params.kappa, params.k_in_mean,
-                         params.A.astype('float'), params.eta)
+    network.set_initial_value(theta_t[0], pm.t_start)
+    if pm.A.sum() / pm.N ** 2 < 0.4:  # Check for sparsity of A
+        network.set_f_params(pm.d_n, pm.n, pm.kappa, pm.k_in_mean,
+                             sparse.csc_matrix(pm.A.astype('float')), pm.eta)
+    else:
+        network.set_f_params(pm.d_n, pm.n, pm.kappa, pm.k_in_mean,
+                             pm.A.astype('float'), pm.eta)
 
     # Time integration
-    print('Network with', params.N, 'nodes | Integrating', params.t_end,
+    print('Network with', pm.N, 'nodes | Integrating', pm.t_end,
           'time units:')
     computation_start = time()
     step = 1
-    while network.successful() and step <= params.t_steps:
-        network.integrate(network.t + params.dt)
+    while network.successful() and step <= pm.t_steps:
+        network.integrate(network.t + pm.dt)
         theta_t[step] = network.y
-        progress = step / params.t_steps
+        progress = step / pm.t_steps
         tn.utils.progress_bar(progress, time()-computation_start)
         step += 1
     print('    Successful. \n')
