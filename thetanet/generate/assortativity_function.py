@@ -137,18 +137,22 @@ def a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
         Assortativity coefficient.
     """
 
+    # TODO: why can mean over edges be computed like that
+    k_mean_edge_in = P_k_in.dot(k_in ** 2) / P_k_in.dot(k_in)
+    k_mean_edge_out = P_k_out.dot(k_out ** 2) / P_k_out.dot(k_out)
+
     k_i = eval('k_' + i_prop)
     k_j = eval('k_' + j_prop)
     P_k_i = eval('P_k_' + i_prop)
     P_k_j = eval('P_k_' + j_prop)
-
-    k_mean = (P_k_in * k_in).sum()
+    k_mean_edge_i = eval('k_mean_edge_' + i_prop)
+    k_mean_edge_j = eval('k_mean_edge_' + j_prop)
 
     count_func = a * np.outer(P_k_i, P_k_j)
     mesh_k_i, mesh_k_j = np.meshgrid(k_i, k_j, indexing='ij')
-    cor = np.sum((mesh_k_i - k_mean) * (mesh_k_j - k_mean) * count_func)
-    std_i = np.sqrt(np.sum((mesh_k_i - k_mean) ** 2 * count_func))
-    std_j = np.sqrt(np.sum((mesh_k_j - k_mean) ** 2 * count_func))
+    cor = np.sum((mesh_k_i - k_mean_edge_i) * (mesh_k_j - k_mean_edge_j) * count_func)
+    std_i = np.sqrt(np.sum((mesh_k_i - k_mean_edge_i) ** 2 * count_func))
+    std_j = np.sqrt(np.sum((mesh_k_j - k_mean_edge_j) ** 2 * count_func))
     r = cor / std_i / std_j
 
     return r

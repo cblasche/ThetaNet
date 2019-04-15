@@ -36,7 +36,7 @@ rho = .0  # in-out-correlation
 c = 0  # assortativity parameter
 r = 0  # assortativity coefficient
 i_prop = 'in'  # post-synaptic neuron property - 'in' / 'out'
-j_prop = 'in'  # pre-synaptic neuron property
+j_prop = 'out'  # pre-synaptic neuron property
 
 
 """ Node network

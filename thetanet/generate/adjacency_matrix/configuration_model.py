@@ -395,18 +395,23 @@ def a_coef_from_matrix(A, i_prop='in', j_prop='out'):
         Assortativity coefficient.
     """
 
+    N = A.shape[0]
+
     K_in = A.sum(axis=1)
     K_out = A.sum(axis=0)
+    K_mean_edge_in = np.sum(K_in ** 2) / A.sum()
+    K_mean_edge_out = np.sum(K_out ** 2) / A.sum()
+
     K_i_prop = eval('K_' + i_prop)
     K_j_prop = eval('K_' + j_prop)
-
-    N = len(K_in)
-    K_mean = K_in.mean()
+    K_mean_edge_i_prop = eval('K_mean_edge_' + i_prop)
+    K_mean_edge_j_prop = eval('K_mean_edge_' + j_prop)
 
     i, j = np.meshgrid(range(N), range(N), indexing='ij')
-    var_i_prop = np.sum(A * (K_i_prop[i] - K_mean) ** 2)
-    var_j_prop = np.sum(A * (K_j_prop[j] - K_mean) ** 2)
-    cor = np.sum(A * (K_i_prop[i] - K_mean) * (K_j_prop[j] - K_mean))
+    var_i_prop = np.sum(A * (K_i_prop[i] - K_mean_edge_i_prop) ** 2)
+    var_j_prop = np.sum(A * (K_j_prop[j] - K_mean_edge_j_prop) ** 2)
+    cor = np.sum(A * (K_i_prop[i] - K_mean_edge_i_prop) *
+                 (K_j_prop[j] - K_mean_edge_j_prop))
     r = cor / (np.sqrt(var_i_prop) * np.sqrt(var_j_prop))
 
     return r
