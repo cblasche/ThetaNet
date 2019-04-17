@@ -15,8 +15,8 @@ P_k_in = k_in.astype(float) ** (-3)
 P_k_in = P_k_in / np.sum(P_k_in)  # to have sum(P_k)=1
 k_in_mean = np.sum(k_in * P_k_in)  # average value of node degrees
 
-k_out_min = 750
-k_out_max = 2000
+k_out_min = k_in_min
+k_out_max = k_in_max
 k_out = np.arange(k_out_min, k_out_max + 1)
 N_k_out = len(k_out)
 P_k_out = k_out.astype(float) ** (-3)
@@ -34,9 +34,9 @@ rho = .0  # in-out-correlation
 """ Assortativity
 """
 c = 0  # assortativity parameter
-r = 0  # assortativity coefficient
-i_prop = 'in'  # post-synaptic neuron property - 'in' / 'out'
-j_prop = 'out'  # pre-synaptic neuron property
+r = 0.0  # assortativity coefficient
+i_prop = 'out'  # post-synaptic neuron property - 'in' / 'out'
+j_prop = 'in'  # pre-synaptic neuron property
 
 
 """ Node network
@@ -45,8 +45,8 @@ K_in, K_out = None, None
 A = None
 
 K_in, K_out = tn.generate.degree_sequence(k_in, P_k_in, k_out, P_k_out, N, rho)
-# A = tn.generate.configuration_model(K_in, K_out, r, i_prop, j_prop)
-A = tn.generate.chung_lu_model(K_in, K_out, rho, c, i_prop, j_prop)
+A = tn.generate.configuration_model(K_in, K_out, r, i_prop, j_prop)
+# A = tn.generate.chung_lu_model(K_in, K_out, rho, c, i_prop, j_prop)
 
 
 """ Degree network

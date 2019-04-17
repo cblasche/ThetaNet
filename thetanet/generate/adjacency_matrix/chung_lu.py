@@ -64,7 +64,7 @@ def matrix_from_sequence(K_in, K_out, c=0, i_prop='in', j_prop='out'):
     return A.astype(int)
 
 
-def chung_lu_model(K_in, K_out, rho=0, c=0,  i_prop='in', j_prop='out'):
+def chung_lu_model(K_in, K_out, rho=0, c=0, i_prop='in', j_prop='out'):
     """ Compute an adjacency matrix from in- and out-degree sequences using the
     Chung Lu model.
     Create a
@@ -100,11 +100,11 @@ def chung_lu_model(K_in, K_out, rho=0, c=0,  i_prop='in', j_prop='out'):
 
     if rho == 0:
         np.random.shuffle(K_out)
-        A = matrix_from_sequence(K_in, K_out, c, i_prop='in', j_prop='out')
+        A = matrix_from_sequence(K_in, K_out, c, i_prop=i_prop, j_prop=j_prop)
 
     elif rho > 0:
         K_out.sort()
-        A = matrix_from_sequence(K_in, K_out, c, i_prop='in', j_prop='out')
+        A = matrix_from_sequence(K_in, K_out, c, i_prop=i_prop, j_prop=j_prop)
         for i in range(1, len(K_in)):
             if correlation_from_matrix(A) < rho:
                 break
@@ -112,7 +112,7 @@ def chung_lu_model(K_in, K_out, rho=0, c=0,  i_prop='in', j_prop='out'):
 
     elif rho < 0:
         K_out[::-1].sort()
-        A = matrix_from_sequence(K_in, K_out, c, i_prop='in', j_prop='out')
+        A = matrix_from_sequence(K_in, K_out, c, i_prop=i_prop, j_prop=j_prop)
         for i in range(1, len(K_in)):
             if correlation_from_matrix(A) > rho:
                 break

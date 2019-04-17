@@ -138,15 +138,17 @@ def a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
     """
 
     # TODO: why can mean over edges be computed like that
-    k_mean_edge_in = P_k_in.dot(k_in ** 2) / P_k_in.dot(k_in)
-    k_mean_edge_out = P_k_out.dot(k_out ** 2) / P_k_out.dot(k_out)
+    k_mean_edge_i_in = P_k_in.dot(k_in ** 2) / P_k_in.dot(k_in)
+    k_mean_edge_i_out = P_k_out.dot(k_out)
+    k_mean_edge_j_in = P_k_in.dot(k_in)
+    k_mean_edge_j_out = P_k_out.dot(k_out ** 2) / P_k_out.dot(k_out)
 
     k_i = eval('k_' + i_prop)
     k_j = eval('k_' + j_prop)
     P_k_i = eval('P_k_' + i_prop)
     P_k_j = eval('P_k_' + j_prop)
-    k_mean_edge_i = eval('k_mean_edge_' + i_prop)
-    k_mean_edge_j = eval('k_mean_edge_' + j_prop)
+    k_mean_edge_i = eval('k_mean_edge_i_' + i_prop)
+    k_mean_edge_j = eval('k_mean_edge_j_' + j_prop)
 
     count_func = a * np.outer(P_k_i, P_k_j)
     mesh_k_i, mesh_k_j = np.meshgrid(k_i, k_j, indexing='ij')
@@ -190,8 +192,12 @@ def a_coef_from_a_func(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
 
     i_mean_axis = {'in': 1, 'out': 0}
     j_mean_axis = {'in': 3, 'out': 2}
+    mean_prop = {'in': 'out', 'out': 'in'}
+    P_k_i_mean = eval('P_k_' + mean_prop[i_prop])
+    P_k_j_mean = eval('P_k_' + mean_prop[j_prop])
 
-    a = a.sum(axis=(i_mean_axis[i_prop], j_mean_axis[j_prop]))
+    a = np.tensordot(a, P_k_j_mean, (j_mean_axis[j_prop], 0))
+    a = np.tensordot(a, P_k_i_mean, (i_mean_axis[i_prop], 0))
 
     r = a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop)
 
