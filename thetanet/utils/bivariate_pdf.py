@@ -144,8 +144,8 @@ def sample_from_bivar_pdf(pdf, N, x0=None, x1=None):
     n0 = pdf.shape[0]
     n1 = pdf.shape[1]
     index = np.random.choice(np.arange(n0*n1), N, p=pdf.ravel())
-    ind0 = index % n1
-    ind1 = np.floor_divide(index, n1)
+    ind0 = np.floor_divide(index, n1)
+    ind1 = index % n1
 
     if x0 is None or x1 is None:
         return ind0, ind1
