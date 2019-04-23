@@ -101,7 +101,7 @@ def bivar_pdf(pdf_y, pdf_z, rho_gauss):
 
     # Cdf of bi-variate normal distribution
     cdf_x_2D = pdf_x_2D.cumsum(0).cumsum(1)
-    cdf_x_2D_func = interpolate.interp2d(x, x, cdf_x_2D, kind='cubic')
+    cdf_x_2D_func = interpolate.RectBivariateSpline(x, x, cdf_x_2D)
 
     # Target cdf through remapping
     y_mapped = map_indices_to_x(pdf_y, x, pdf_x)

@@ -227,8 +227,8 @@ def correlation_from_sequences(K_in, K_out):
         Pearson correlation coefficient.
     """
 
-    rho = np.sum((K_in - K_in.mean()) / np.std(K_in) * (K_out - K_out.mean())
-                 / np.std(K_out)) / len(K_in)
+    rho = np.sum((K_in - K_in.mean()) * (K_out - K_out.mean())) \
+          / np.std(K_out) / np.std(K_in) / len(K_in)
 
     return rho
 

@@ -28,7 +28,7 @@ P_k = np.outer(P_k_in, P_k_out)
 if k_in_mean == k_out_mean:
     k_mean = k_in_mean
 
-rho = .0  # in-out-correlation
+rho = .4  # in-out-correlation
 
 
 """ Assortativity
@@ -45,7 +45,7 @@ K_in, K_out = None, None
 A = None
 
 K_in, K_out = tn.generate.degree_sequence(k_in, P_k_in, k_out, P_k_out, N, rho)
-A = tn.generate.configuration_model(K_in, K_out, r, i_prop, j_prop)
+# A = tn.generate.configuration_model(K_in, K_out, r, i_prop, j_prop)
 # A = tn.generate.chung_lu_model(K_in, K_out, rho, c, i_prop, j_prop)
 
 
