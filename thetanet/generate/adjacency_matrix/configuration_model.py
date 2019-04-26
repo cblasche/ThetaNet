@@ -132,11 +132,28 @@ def reconnect_edge_pair(A, I, J):
     -------
     A will be modified.
     """
-
-    A[I[0], I[1]] -= 1
-    A[J[0], J[1]] -= 1
-    A[J[0], I[1]] += 1
-    A[I[0], J[1]] += 1
+    if len(I.shape) > 1:
+        if A[A>1].sum() > 0:
+            I0I1, I0I1_counts = np.unique(np.asarray([I[0], I[1]]), axis=1, return_counts=True)
+            J0J1, J0J1_counts = np.unique(np.asarray([J[0], J[1]]), axis=1, return_counts=True)
+            I0J1, I0J1_counts = np.unique(np.asarray([I[0], J[1]]), axis=1, return_counts=True)
+            J0I1, J0I1_counts = np.unique(np.asarray([J[0], I[1]]), axis=1, return_counts=True)
+            A[I0I1[0], I0I1[1]] -= I0I1_counts
+            A[J0J1[0], J0J1[1]] -= J0J1_counts
+            A[I0J1[0], I0J1[1]] += I0J1_counts
+            A[J0I1[0], J0I1[1]] += J0I1_counts
+        else:
+            I0J1, I0J1_counts = np.unique(np.asarray([I[0], J[1]]), axis=1, return_counts=True)
+            J0I1, J0I1_counts = np.unique(np.asarray([J[0], I[1]]), axis=1, return_counts=True)
+            A[I[0], I[1]] -= 1
+            A[J[0], J[1]] -= 1
+            A[I0J1[0], I0J1[1]] += I0J1_counts
+            A[J0I1[0], J0I1[1]] += J0I1_counts
+    else:
+        A[I[0], I[1]] -= 1
+        A[J[0], J[1]] -= 1
+        A[I[0], J[1]] += 1
+        A[J[0], I[1]] += 1
 
     return
 
