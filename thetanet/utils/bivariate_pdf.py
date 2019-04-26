@@ -151,3 +151,35 @@ def sample_from_bivar_pdf(pdf, N, x0=None, x1=None):
         return ind0, ind1
     else:
         return x0[ind0], x1[ind1]
+
+
+def correlation_from_pdf(pdf, x0, x1):
+    """ Compute Pearson correlation coefficient for given joint pdf of random
+    variables x0 and x1.
+
+    Parameters
+    ----------
+    pdf : ndarray, 2D float
+        Probability density function of 2D variable (x0, x1).
+    x0 : ndarray, 1D float
+        Space of random variable x0.
+    x1 : ndarray, 1D float
+        Space of random variable x1.
+
+    Returns
+    -------
+    rho : float
+        Pearson correlation coefficient.
+    """
+
+    pdf_x0 = pdf.sum(1)
+    pdf_x1 = pdf.sum(0)
+    x0_mean = x0.dot(pdf_x0)
+    x1_mean = x1.dot(pdf_x1)
+
+    cov = (np.outer(x0-x0_mean, x1-x1_mean) * pdf).sum()
+    std_x0 = np.sqrt((pdf_x0 * (x0 - x0_mean) ** 2).sum())
+    std_x1 = np.sqrt((pdf_x1 * (x1 - x1_mean) ** 2).sum())
+    rho = cov / std_x0 / std_x1
+
+    return rho

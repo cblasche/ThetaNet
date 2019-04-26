@@ -1,6 +1,7 @@
 import numpy as np
 import thetanet as tn
 from time import time
+from scipy import interpolate
 
 
 def configuration_model(K_in, K_out, r=0, i_prop='in', j_prop='out'):
@@ -155,43 +156,32 @@ def remove_self_edges(A):
     A will be modified.
     """
 
-    edges = np.argwhere(A > 0)
-    unique_edges = np.unique(edges, axis=0)
-    num_unique_edges = len(unique_edges)
-    overflow = np.sum(A) - num_unique_edges
-    edges = np.append(unique_edges, np.zeros((overflow, 2), dtype=int), axis=0)
-    self_edges_indices = np.flatnonzero(unique_edges[:, 0] ==
-                                        unique_edges[:, 1])     # index of self-
-                                                                # edges in edges
+    edges = np.empty((0, 2), dtype=int)
+    for i in range(1, A.max() + 1):
+        edges = np.append(edges, np.argwhere(A >= i), axis=0)
+    num_edges = edges.shape[0]
+    self_edge_indices = np.flatnonzero(edges[:, 0] == edges[:, 1])
 
-    # loop through self-edges
-    for self_edges_index in self_edges_indices:
-        I = np.copy(edges[self_edges_index])
-        while A[I[0], I[1]] > 0:
-            picked = np.random.choice(num_unique_edges)
-            J = np.copy(edges[picked])
-            if A[J[0], I[1]] == 0 and A[I[0], J[1]] == 0:  # avoid multi-edges
+    for self_edge_index in self_edge_indices:
+        I = np.copy(edges[self_edge_index])
+        A_I_init = np.copy(A[I[0], I[1]])
+        while A[I[0], I[1]] == A_I_init:
+            rand_index = np.random.choice(num_edges)
+            J = np.copy(edges[rand_index])
+            # avoid multi-edges
+            if A[J[0], I[1]] == 0 and A[I[0], J[1]] == 0:
                 reconnect_edge_pair(A, I, J)
-
                 # update edges
-                if A[J[0], J[1]] == 0:
-                    edges[picked] = [J[0], I[1]]
-                else:  # if picked edge is a multi-edge create new unique edge
-                    num_unique_edges += 1
-                    edges[num_unique_edges - 1] = [J[0], I[1]]
-                if A[I[0], I[1]] == 0:
-                    edges[self_edges_index] = [I[0], J[1]]
-                else:  # if self-edge is also multi-edge create new unique edge
-                    num_unique_edges += 1
-                    edges[num_unique_edges - 1] = [I[0], J[1]]
+                edges[rand_index] = [J[0], I[1]]
+                edges[self_edge_index] = [I[0], J[1]]
 
     return
 
 
-def remove_multi_edges(A):
+def remove_multi_edges(A, console_output=False):
     """  If adjacency matrix has entries higher than 1 (multi-edge) they will
     be removed by swapping connections. This will not affect degree distribution
-    and degree correlation.
+    and node correlation.
 
     Parameters
     ----------
@@ -203,44 +193,54 @@ def remove_multi_edges(A):
     A will be modified.
     """
 
-    edges = np.argwhere(A > 0)
-    unique_edges = np.unique(edges, axis=0)
-    num_unique_edges = len(unique_edges)
-    num_multi_edges = np.sum(A) - num_unique_edges
-    edges = np.append(unique_edges, np.zeros((num_multi_edges, 2), dtype=int),
-                      axis=0)
-    multi_edges = np.argwhere(A > 1)
+    if console_output:
+        print('\nRemoving multi-edges')
+        print('|......................................')
+        print('| N =', A.shape[0], 'and N_edges =', A.sum())
+        print('| N_multi_edges =', A[A > 1].sum())
+        print('|......................................')
 
-    # loop through multi-edges
-    for I in multi_edges:
-        while A[I[0], I[1]] > 1:
-            picked = np.random.choice(num_unique_edges)
-            J = np.copy(edges[picked])
-            if I[0] != J[1] and J[0] != I[1]:  # avoid self-edges
-                if A[J[0], I[1]] == 0 and A[I[0], J[1]] == 0:   # avoid more
-                                                                # multi-edges
-                    reconnect_edge_pair(A, I, J)
+    runtime_start = time()
 
-                    # update edges
-                    num_unique_edges += 1
-                    edges[num_unique_edges - 1] = [I[0], J[1]]
-                    if A[J[0], J[1]] == 0:
-                        edges[picked] = [J[0], I[1]]
-                    else:   # if picked edge is a multi-edge create new unique
-                            # edge
-                        num_unique_edges += 1
-                        edges[num_unique_edges - 1] = [J[0], I[1]]
+    edges = np.empty((0, 2), dtype=int)
+    for i in range(1, A.max()+1):
+        edges = np.append(edges, np.argwhere(A >= i), axis=0)
+    num_edges = edges.shape[0]
+    multi_indices = np.argwhere(A[edges[:, 0], edges[:, 1]] > 1).squeeze()
+
+    for multi_index in multi_indices:
+        I = np.copy(edges[multi_index])
+        A_I_init = np.copy(A[I[0], I[1]])
+        if A_I_init > 1:
+            while A[I[0], I[1]] == A_I_init:
+                rand_index = np.random.choice(num_edges)
+                J = np.copy(edges[rand_index])
+                # avoid self-edges
+                if I[0] != J[1] and J[0] != I[1]:
+                    # avoid additional multi-edges
+                    if A[J[0], I[1]] == 0 and A[I[0], J[1]] == 0:
+                        reconnect_edge_pair(A, I, J)
+                        # update edges
+                        edges[multi_index] = [I[0], J[1]]
+                        edges[rand_index] = [J[0], I[1]]
+
+    if console_output:
+        print('| N_multi_edges =', A[A > 1].sum())
+        print('|......................................')
+        print('| runtime:', np.round(time()-runtime_start, 1), 'sec\n')
 
     return
 
 
-def assortative_mixing(A, r, i_prop='in', j_prop='out'):
+def assortative_mixing(A, r, i_prop='in', j_prop='out', console_output=True,
+                       eliminate_multi_edges=True, precision=0.001):
     """ Mix connections in adjacency matrix to achieve desired assortativity of
     respective properties of pre-(j) and post-(i)-synaptic neurons.
-    First take a selection of the available edges, split this selection and
+    Firstly, take a selection of the available edges, split this selection and
     built pairs. Check for each pair if reconnecting is a good decision.
-    Second check if assortativity coefficient is not already too extreme. If
-    so, reduce the number of edge pairs.
+    Secondly, check if assortativity coefficient is not already exceeded. If
+    so, reduce the number of edge pairs of that last iteration and repeat.
+    Estimate the reduction based on a interpolation approach.
 
     Parameters
     ----------
@@ -254,122 +254,160 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out'):
     j_prop : str
         Respective node degree which is involved in assortative mixing.
         ('in' or 'out').
+    console_output: bool
+        Whether or not to print details and insights to the console.
+    eliminate_multi_edges: bool
+         Remove multi_edges within the scheme.
+    precision: float (positive)
+        Define how close the algorithm has to approach r.
 
     Returns
     -------
     A will be modified.
     """
 
-    def swap_criteria(I, J, K_i_prop, K_j_prop, K_mean, r_diff):
-        """ Compute for 2 lists of edges I and J if they should be swapped.
-        Criteria are based on changing the assortativity in the desired
-        direction as well as to avoid further self-edges and minimize
-        multi-edges.
-
-        Parameters
-        ----------
-        I : ndarray, 1D int
-            An edge from A. I[0] is post-synaptic and I[1] is pre-synaptic.
-        J : ndarray, 1D int
-            An edge from A. J[0] is post-synaptic and J[1] is pre-synaptic.
-        K_i_prop : ndarray, 1D int
-            Degree sequence of post-synaptic neurons (i) of respective property.
-        K_j_prop : ndarray, 1D int
-            Degree sequence of pre-synaptic neurons (j) of respective property.
-        K_mean : float
-            Mean degree of degree sequence.
-        r_diff : float
-            Difference between current and target assortativity coefficient.
-
-        Returns
-        -------
-        swap : ndarray, 1D bool
-            Boolean value if pair should be swapped.
-        """
-
-        # Criteria: adjust assortativity in desired direction
-        cor_original = (K_i_prop[I[0]] - K_mean) * (K_j_prop[I[1]] - K_mean) + \
-                       (K_i_prop[J[0]] - K_mean) * (K_j_prop[J[1]] - K_mean)
-        cor_swap = (K_i_prop[I[0]] - K_mean) * (K_j_prop[J[1]] - K_mean) + \
-                   (K_i_prop[J[0]] - K_mean) * (K_j_prop[I[1]] - K_mean)
+    def selection_criteria(A, I, J, r_diff):
+        # Criteria 1: reconnect edges only if it benefits the edge correlation
+        K_in = A.sum(axis=1)
+        K_out = A.sum(axis=0)
+        num_edges = K_in.sum()
+        K_i_prop = eval('K_' + i_prop)
+        K_j_prop = eval('K_' + j_prop)
+        K_mean_edge_i = (K_i_prop[np.append(I[0], J[0])]).sum() / num_edges
+        K_mean_edge_j = (K_i_prop[np.append(I[1], J[1])]).sum() / num_edges
+        cor_original = (K_i_prop[I[0]] - K_mean_edge_i) * \
+                       (K_j_prop[I[1]] - K_mean_edge_j) + \
+                       (K_i_prop[J[0]] - K_mean_edge_i) * \
+                       (K_j_prop[J[1]] - K_mean_edge_j)
+        cor_swapped = (K_i_prop[I[0]] - K_mean_edge_i) * \
+                      (K_j_prop[J[1]] - K_mean_edge_j) + \
+                      (K_i_prop[J[0]] - K_mean_edge_i) * \
+                      (K_j_prop[I[1]] - K_mean_edge_j)
         if r_diff > 0:
-            criteria_cor = (cor_swap > cor_original)
+            criteria_cor = (cor_swapped > cor_original)
         else:
-            criteria_cor = (cor_swap < cor_original)
+            criteria_cor = (cor_swapped < cor_original)
 
-        # Criteria: avoid multi-edges directly when adding 1 to certain entries
+        # Criteria 2: avoid multi-edges directly when adding 1 to certain entries
         criteria_multi = np.logical_and((A[J[0], I[1]] == 0),
                                         (A[I[0], J[1]] == 0))
 
-        # Criteria: avoid self-edges when adding 1 to the diagonal
+        # Criteria 3: avoid self-edges when adding 1 to the diagonal
         criteria_self = np.logical_and((I[0] != J[1]), (J[0] != I[1]))
 
-        # Criteria: avoid multi-edges when adding 1 when it has been done
-        # already by another pair of edges
-        # Note: This is not dynamic, hence there will be some multi-edges.
-        first_occurence_JI = np.unique([J[0], I[1]], axis=1,
-                                       return_index=True)[1]
-        first_occurence_IJ = np.unique([I[0], J[1]], axis=1,
-                                       return_index=True)[1]
-        criteria_unique = np.full((2, I.shape[1]), False)
-        criteria_unique[0][first_occurence_IJ] = True
-        criteria_unique[1][first_occurence_JI] = True
-        criteria_unique = np.logical_and(criteria_unique[0], criteria_unique[1])
+        select = (criteria_cor * criteria_multi * criteria_self).astype(bool)
 
-        # apply all criteria
-        swap = (criteria_cor * criteria_multi * criteria_self *
-                criteria_unique).astype(bool)
-
-        return swap
-
-    # Compute sequences
-    K_in = A.sum(axis=1)
-    K_out = A.sum(axis=0)
-    K_mean = K_in.mean()    # K_in_mean and K_out_mean are equal
-
-    # Match them to their respective property of pre-(j) and post-(i)-synaptic
-    # neuron
-    K_i_prop = eval('K_' + i_prop)
-    K_j_prop = eval('K_' + j_prop)
-
-    # Converge to desired assortativity
-    r_diff = r - a_coef_from_matrix(A, i_prop, j_prop)
-    iteration = 0
-    limited_edges = int(A.sum())    # start with considering all edges
-    while abs(r_diff) > 0.01:
-        iteration += 1
-        # Determine pairs of edges to swap
-        edges = np.argwhere(A)
-        np.random.shuffle(edges)
-        edges = edges[:limited_edges]  # limit the speed of approaching r
-        if len(edges) % 2 == 0:
-            I, J = np.split(edges.T, 2, axis=1)
-        else:
-            I, J = np.split(edges[:-1].T, 2, axis=1)
-        swap = swap_criteria(I, J, K_i_prop, K_j_prop, K_mean, r_diff)
-        if swap.any() != True:
+        if select.any() != True:
             print('Desired assortativity coefficient r=', r, 'is impossible ',
                   'to reach for this network configuration.')
             return
 
-        # New assortativity coefficient can be too extreme and needs to be
-        # checked with a dummy therefore.
-        A_dummy = np.copy(A)
-        reconnect_edge_pair(A_dummy, I[:, swap], J[:, swap])
-        remove_multi_edges(A_dummy)
-        r_diff_dummy = r - a_coef_from_matrix(A_dummy, i_prop, j_prop)
-        if abs(r_diff_dummy) < abs(r_diff):
-            A[...] = A_dummy[...]
-            r_diff = r_diff_dummy
-            print('\r      Iteration', iteration, ': r_diff =', r_diff)
+        return select
+
+    def reconnect_selection(A, I, J, select):
+        """
+        I and J the edges of A split in two lists of equal size. Reconnect
+        reconnect pairs of edges (I,J) only when they are selected according to
+        the 'select array.
+        """
+        A_trial = np.copy(A)
+        reconnect_edge_pair(A_trial, I[:, select], J[:, select])
+        if eliminate_multi_edges:
+            tn.generate.remove_multi_edges(A_trial)
+        r_diff_trial = r - tn.generate.a_coef_from_matrix(A_trial, i_prop, j_prop)
+        return A_trial, r_diff_trial
+
+    def edges(A):
+        """
+        Return a shuffled list of edges in A.
+        Dimension 0: in-out-node
+        Dimension 1: as long as there are edges
+        """
+        edges = np.empty((0, 2), dtype=int)
+        for i in range(1, A.max() + 1):
+            edges = np.append(edges, np.argwhere(A >= i), axis=0)
+        num_edges = edges.shape[0]
+        rand_indices = np.random.choice(num_edges, num_edges, replace=False)
+        return edges[rand_indices].T
+
+    def refine_selection(A, I, J, select, r_diff, r_diff_trial):
+        """
+        Adjust r by deselecting an appropriate amount of the edges for the
+        reconnection process.
+        The amount of edges to deselect is interpolated on the basis of known
+        data points.
+        """
+        if console_output:
+            print('\r|        refining last iteration:')
+
+        r_diff_interp = [r_diff, r_diff_trial]
+        limit_interp = [0, I.shape[1]]
+        interp_kind = 'linear'
+        limit = int(interpolate.interp1d(r_diff_interp, limit_interp,
+                                         kind=interp_kind)(0))
+
+        iteration_refine = 0
+        while abs(r_diff_trial) > precision:
+            iteration_refine += 1
+            select_trial = np.copy(select)
+            select_trial[limit:] = False
+
+            A_trial, r_diff_trial = reconnect_selection(A, I, J, select_trial)
+
+            # Add every point to the pool to increase interpolation accuracy.
+            r_diff_interp.append(r_diff_trial)
+            limit_interp.append(limit)
+            # After selecting enough data, change to cubic interpolation
+            if len(r_diff_interp) >= 4:
+                interp_kind = 'cubic'
+            limit = int(interpolate.interp1d(r_diff_interp, limit_interp,
+                                             kind=interp_kind)(0))
+            if console_output:
+                print('\r|        ', iteration, '_', iteration_refine, ': r =',
+                      np.round(r - r_diff_trial, 5))
+        return A_trial, r_diff_trial
+
+    runtime_start = time()
+    r_diff = r - tn.generate.a_coef_from_matrix(A, i_prop, j_prop)
+    if console_output:
+        print('\nAssortative mixing of type (', j_prop, ',', i_prop, ')')
+        print('|......................................')
+        print('| N =', A.shape[0], 'and N_e =', A.sum())
+        if eliminate_multi_edges:
+            print('| removing multi-edges: enabled')
         else:
-            limited_edges = int(limited_edges * 0.3)
-            # swap[-limited_edges:] = False
-            # reconnect_edge_pair(A, I[:, swap], J[:, swap])
-            # remove_multi_edges(A)
-            # r_diff = r - assort_coef_from_matrix(A, i_prop, j_prop)
-            print('\r      Iteration', iteration, ': r_diff =', r_diff,
-                  '(Step size has been reduced.)')
+            print('| removing multi-edges: disabled')
+        print('| current r =', np.round(r - r_diff, 3))
+        print('| target r =', np.round(r, 3))
+        print('| precision:', precision)
+        print('|......................................')
+    iteration = 0
+
+    while abs(r_diff) > precision:
+        iteration += 1
+        I, J = np.split(edges(A), 2, axis=1)
+        select = selection_criteria(A, I, J, r_diff)
+        A_trial, r_diff_trial = reconnect_selection(A, I, J, select)
+
+        if console_output:
+            print('\r|    ', iteration, ': r =',
+                  np.round(r - r_diff_trial, 5))
+
+        # Before accepting this process, check if we already went beyond the
+        # target r. If so, the sign in r_diff changes.
+        # In this case no further iteration is required, since we can achieve
+        # the desired r by reducing the amount of selected edge pairs.
+        if np.sign(r_diff_trial) != np.sign(r_diff):
+            A_trial, r_diff_trial = refine_selection(A, I, J, select, r_diff,
+                                                     r_diff_trial)
+
+        # Copy values to A in-place
+        A[...] = A_trial[...]
+        r_diff = r_diff_trial
+
+    if console_output:
+        print('|......................................')
+        print('| runtime:', np.round(time() - runtime_start, 1), 'sec')
 
     return
 
