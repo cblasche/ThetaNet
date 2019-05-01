@@ -204,6 +204,8 @@ def remove_multi_edges(A, console_output=False):
     ----------
     A : ndarray, 2D int
         Adjacency matrix.
+    console_output: bool
+        Whether or not to print details to the console.
 
     Returns
     -------
@@ -272,7 +274,7 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out', console_output=True,
         Respective node degree which is involved in assortative mixing.
         ('in' or 'out').
     console_output: bool
-        Whether or not to print details and insights to the console.
+        Whether or not to print details to the console.
     eliminate_multi_edges: bool
          Remove multi_edges within the scheme.
     precision: float (positive)

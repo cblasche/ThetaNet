@@ -1,5 +1,5 @@
 import numpy as np
-from scipy import optimize
+from scipy import ndimage
 import thetanet as tn
 
 """
@@ -52,7 +52,8 @@ def a_func_transform(A, k_in):
     return E, B
 
 
-def a_func_empirical2D(A, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
+def a_func_empirical2D(A, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop,
+                       smooth_function=True):
     """ Create an assortativity function based on counting connections of an
     adjacency matrix.
 
@@ -74,6 +75,8 @@ def a_func_empirical2D(A, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
     j_prop : str
         Respective node degree which is involved in assortative mixing.
         ('in' or 'out').
+    smooth_function : bool
+        Apply gaussian filter to smooth the finite size noise.
 
     Returns
     -------
@@ -103,6 +106,9 @@ def a_func_empirical2D(A, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
     count_func[unique_degree_combis[0], unique_degree_combis[1]] += counts
 
     a = count_func / N ** 2 / P_k_i[:, None] / P_k_j[None, :]
+
+    if smooth_function:
+        a = ndimage.gaussian_filter(a, [len(k_in)/20, len(k_out)/20])
 
     return a
 
@@ -138,6 +144,7 @@ def a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
     """
 
     # TODO: why can mean over edges be computed like that
+    # averaging in- or out-degrees over sending(j) or receiving(i) side of edges
     k_mean_edge_i_in = P_k_in.dot(k_in ** 2) / P_k_in.dot(k_in)
     k_mean_edge_i_out = P_k_out.dot(k_out)
     k_mean_edge_j_in = P_k_in.dot(k_in)
@@ -152,7 +159,8 @@ def a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
 
     count_func = a * np.outer(P_k_i, P_k_j)
     mesh_k_i, mesh_k_j = np.meshgrid(k_i, k_j, indexing='ij')
-    cor = np.sum((mesh_k_i - k_mean_edge_i) * (mesh_k_j - k_mean_edge_j) * count_func)
+    cor = np.sum((mesh_k_i - k_mean_edge_i) * (mesh_k_j - k_mean_edge_j)
+                 * count_func)
     std_i = np.sqrt(np.sum((mesh_k_i - k_mean_edge_i) ** 2 * count_func))
     std_j = np.sqrt(np.sum((mesh_k_j - k_mean_edge_j) ** 2 * count_func))
     r = cor / std_i / std_j
@@ -162,8 +170,7 @@ def a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
 
 def a_coef_from_a_func(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
     """ Compute the assortativity coefficient from a 4D assortativity function.
-    Reconstruct 'count_func' one would gain from the adjacency matrix first and
-    then compute correlation.
+    Project 4D function to the relevant 2D one and compute r from it.
 
     Parameters
     ----------
@@ -189,9 +196,10 @@ def a_coef_from_a_func(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
     r : float
         Assortativity coefficient.
     """
-
+    # choose axis which is to be contracted
     i_mean_axis = {'in': 1, 'out': 0}
     j_mean_axis = {'in': 3, 'out': 2}
+    # choose property of contraction
     mean_prop = {'in': 'out', 'out': 'in'}
     P_k_i_mean = eval('P_k_' + mean_prop[i_prop])
     P_k_j_mean = eval('P_k_' + mean_prop[j_prop])
@@ -255,7 +263,7 @@ def a_func_linear(k_in, k_out, N, k_mean, c, i_prop, j_prop):
         np.ones(len(k_out))[None, :, None, None] * \
         np.ones(len(k_in))[None, None, :, None] * \
         k_out[None, None, None, :]
-
+    #TODO: check mean values!
     a += c * (k_j - k_mean) * (k_i - k_mean)
     a /= N * k_mean
     a = np.clip(a, 0, 1)

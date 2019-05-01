@@ -24,7 +24,8 @@ def correlation_from_matrix(A):
     return rho
 
 
-def matrix_from_sequence(K_in, K_out, c=0, i_prop='in', j_prop='out'):
+def chung_lu_model(K_in, K_out, k_in, P_k_in, k_out, P_k_out, c=0, i_prop='in',
+                   j_prop='out'):
     """ Chung Lu style adjacency matrix creation. Generating a target matrix T
     and compare it with a matrix filled with random variables. Assortativity
     may be induced by a non-zero c value.
@@ -35,6 +36,14 @@ def matrix_from_sequence(K_in, K_out, c=0, i_prop='in', j_prop='out'):
         In-degree sequence.
     K_out : ndarray, 1D int
         Out-degree sequence.
+    k_in : ndarray, 1D int
+        In-degree space.
+    P_k_in : ndarray, 1D float
+        In-degree probability.
+    k_out : ndarray, 1D int
+        Out-degree space.
+    P_k_out : ndarray, 1D float
+        Out-degree probability.
     c : float
         Assortativity parameter.
     i_prop : str
@@ -49,78 +58,26 @@ def matrix_from_sequence(K_in, K_out, c=0, i_prop='in', j_prop='out'):
     A : ndarray, 2D int
         Adjacency matrix.
     """
+
+    # averaging in- or out-degrees over sending(j) or receiving(i) side of edges
+    k_mean_edge_i_in = P_k_in.dot(k_in ** 2) / P_k_in.dot(k_in)
+    k_mean_edge_i_out = P_k_out.dot(k_out)
+    k_mean_edge_j_in = P_k_in.dot(k_in)
+    k_mean_edge_j_out = P_k_out.dot(k_out ** 2) / P_k_out.dot(k_out)
+
+    k_mean_edge_i = eval('k_mean_edge_i_' + i_prop)
+    k_mean_edge_j = eval('k_mean_edge_j_' + j_prop)
+    K_i = eval('K_' + i_prop)
+    K_j = eval('K_' + j_prop)
 
     N = K_in.shape[0]
 
-    delta_K_in = (K_in - K_in.mean()) / K_in.std()
-    delta_K_out = (K_out - K_out.mean()) / K_out.std()
-    delta_K_i_prop = eval('delta_K_'+i_prop)
-    delta_K_j_prop = eval('delta_K_'+j_prop)
-
-    T = (np.outer(K_in, K_out) / (N * K_in.mean())) * \
-        (1 + c*np.outer(delta_K_i_prop, delta_K_j_prop))
-    A = np.random.uniform(size=(N, N)) < np.clip(T, 0, 1)
+    T = (np.outer(K_in, K_out) +
+         c*np.outer((K_i - k_mean_edge_i), (K_j - k_mean_edge_j))) \
+        / (N * K_in.mean())
+    A = np.random.uniform(size=(N, N)) < T
 
     return A.astype(int)
-
-
-def chung_lu_model(K_in, K_out, rho=0, c=0, i_prop='in', j_prop='out'):
-    """ Compute an adjacency matrix from in- and out-degree sequences using the
-    Chung Lu model.
-    Create a
-
-    Parameters
-    ----------
-    K_in : ndarray, 1D int
-        In-degree sequence.
-    K_out : ndarray, 1D int
-        Out-degree sequence.
-    rho : float
-        Correlation coefficient between in- and out-degree
-    c : float
-        Assortativity parameter.
-    i_prop : str
-        Respective node degree which is involved in assortative mixing.
-        ('in' or 'out').
-    j_prop : str
-        Respective node degree which is involved in assortative mixing.
-        ('in' or 'out').
-
-    Returns
-    -------
-    A : ndarray, 2D int
-        Adjacency matrix.
-    """
-
-    print('Adjacency matrix - Chug Lu model | N =', len(K_in), '| K_in = [',
-          min(K_in), ',', max(K_in), '] | K_out = [', min(K_out), ',',
-          max(K_out), '] | rho =', rho, '| c =', c)
-
-    K_in.sort()
-
-    if rho == 0:
-        np.random.shuffle(K_out)
-        A = matrix_from_sequence(K_in, K_out, c, i_prop=i_prop, j_prop=j_prop)
-
-    elif rho > 0:
-        K_out.sort()
-        A = matrix_from_sequence(K_in, K_out, c, i_prop=i_prop, j_prop=j_prop)
-        for i in range(1, len(K_in)):
-            if correlation_from_matrix(A) < rho:
-                break
-            tn.generate.swap_pair(A)
-
-    elif rho < 0:
-        K_out[::-1].sort()
-        A = matrix_from_sequence(K_in, K_out, c, i_prop=i_prop, j_prop=j_prop)
-        for i in range(1, len(K_in)):
-            if correlation_from_matrix(A) > rho:
-                break
-            tn.generate.swap_pair(A)
-
-    print('    Successful.')
-
-    return A
 
 
 def assortative_mixing_float(T, r, i_prop='in', j_prop='out'):
