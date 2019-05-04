@@ -24,8 +24,8 @@ def correlation_from_matrix(A):
     return rho
 
 
-def chung_lu_model(K_in, K_out, k_in, P_k_in, k_out, P_k_out, c=0, i_prop='in',
-                   j_prop='out'):
+def chung_lu_model(K_in, K_out, k_in=None, k_out=None, P_k=None, c=0,
+                   i_prop='in', j_prop='out'):
     """ Chung Lu style adjacency matrix creation. Generating a target matrix T
     and compare it with a matrix filled with random variables. Assortativity
     may be induced by a non-zero c value.
@@ -38,12 +38,10 @@ def chung_lu_model(K_in, K_out, k_in, P_k_in, k_out, P_k_out, c=0, i_prop='in',
         Out-degree sequence.
     k_in : ndarray, 1D int
         In-degree space.
-    P_k_in : ndarray, 1D float
-        In-degree probability.
     k_out : ndarray, 1D int
         Out-degree space.
-    P_k_out : ndarray, 1D float
-        Out-degree probability.
+    P_k : ndarray, 1D float
+        Joint In-Out-degree probability.
     c : float
         Assortativity parameter.
     i_prop : str
@@ -59,22 +57,28 @@ def chung_lu_model(K_in, K_out, k_in, P_k_in, k_out, P_k_out, c=0, i_prop='in',
         Adjacency matrix.
     """
 
-    # averaging in- or out-degrees over sending(j) or receiving(i) side of edges
-    k_mean_edge_i_in = P_k_in.dot(k_in ** 2) / P_k_in.dot(k_in)
-    k_mean_edge_i_out = P_k_out.dot(k_out)
-    k_mean_edge_j_in = P_k_in.dot(k_in)
-    k_mean_edge_j_out = P_k_out.dot(k_out ** 2) / P_k_out.dot(k_out)
-
-    k_mean_edge_i = eval('k_mean_edge_i_' + i_prop)
-    k_mean_edge_j = eval('k_mean_edge_j_' + j_prop)
-    K_i = eval('K_' + i_prop)
-    K_j = eval('K_' + j_prop)
-
     N = K_in.shape[0]
 
-    T = (np.outer(K_in, K_out) +
-         c*np.outer((K_i - k_mean_edge_i), (K_j - k_mean_edge_j))) \
-        / (N * K_in.mean())
+    T = np.outer(K_in, K_out) / (N * K_in.mean())
+
+    if c !=0:
+        P_k_in = P_k.sum(1)
+        P_k_out = P_k.sum(0)
+        k_mean = P_k_in.dot(k_in)
+
+        k_mean_edge_i_in = P_k_in.dot(k_in ** 2) / k_mean
+        k_mean_edge_i_out = (P_k * np.outer(k_in, k_out)).sum() / k_mean
+        k_mean_edge_j_in = k_mean_edge_i_out
+        k_mean_edge_j_out = P_k_out.dot(k_out ** 2) / k_mean
+
+        k_mean_edge_i = eval('k_mean_edge_i_' + i_prop)
+        k_mean_edge_j = eval('k_mean_edge_j_' + j_prop)
+        K_i = eval('K_' + i_prop)
+        K_j = eval('K_' + j_prop)
+
+        T += c * np.outer((K_i - k_mean_edge_i), (K_j - k_mean_edge_j)) \
+            / (N * K_in.mean())
+
     A = np.random.uniform(size=(N, N)) < T
 
     return A.astype(int)
