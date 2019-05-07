@@ -46,7 +46,7 @@ def configuration_model(K_in, K_out, r=0, i_prop='in', j_prop='out'):
     print('Successful.')
 
     print('\r    Remove multi-edges:', end=' ')
-    remove_multi_edges(A)
+    remove_multi_edges(A, console_output=False)
     print('Successful.')
 
     if r != 0:
@@ -134,17 +134,23 @@ def reconnect_edge_pair(A, I, J):
     """
     if len(I.shape) > 1:
         if A[A>1].sum() > 0:
-            I0I1, I0I1_counts = np.unique(np.asarray([I[0], I[1]]), axis=1, return_counts=True)
-            J0J1, J0J1_counts = np.unique(np.asarray([J[0], J[1]]), axis=1, return_counts=True)
-            I0J1, I0J1_counts = np.unique(np.asarray([I[0], J[1]]), axis=1, return_counts=True)
-            J0I1, J0I1_counts = np.unique(np.asarray([J[0], I[1]]), axis=1, return_counts=True)
+            I0I1, I0I1_counts = np.unique(np.asarray([I[0], I[1]]), axis=1,
+                                          return_counts=True)
+            J0J1, J0J1_counts = np.unique(np.asarray([J[0], J[1]]), axis=1,
+                                          return_counts=True)
+            I0J1, I0J1_counts = np.unique(np.asarray([I[0], J[1]]), axis=1,
+                                          return_counts=True)
+            J0I1, J0I1_counts = np.unique(np.asarray([J[0], I[1]]), axis=1,
+                                          return_counts=True)
             A[I0I1[0], I0I1[1]] -= I0I1_counts
             A[J0J1[0], J0J1[1]] -= J0J1_counts
             A[I0J1[0], I0J1[1]] += I0J1_counts
             A[J0I1[0], J0I1[1]] += J0I1_counts
         else:
-            I0J1, I0J1_counts = np.unique(np.asarray([I[0], J[1]]), axis=1, return_counts=True)
-            J0I1, J0I1_counts = np.unique(np.asarray([J[0], I[1]]), axis=1, return_counts=True)
+            I0J1, I0J1_counts = np.unique(np.asarray([I[0], J[1]]), axis=1,
+                                          return_counts=True)
+            J0I1, J0I1_counts = np.unique(np.asarray([J[0], I[1]]), axis=1,
+                                          return_counts=True)
             A[I[0], I[1]] -= 1
             A[J[0], J[1]] -= 1
             A[I0J1[0], I0J1[1]] += I0J1_counts
@@ -316,7 +322,7 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out', console_output=True,
 
         select = (criteria_cor * criteria_multi * criteria_self).astype(bool)
 
-        if select.any() != True:
+        if not select.any():
             print('Desired assortativity coefficient r=', r, 'is impossible ',
                   'to reach for this network configuration.')
             return
@@ -333,7 +339,7 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out', console_output=True,
         reconnect_edge_pair(A_trial, I[:, select], J[:, select])
         if eliminate_multi_edges:
             tn.generate.remove_multi_edges(A_trial)
-        r_diff_trial = r - tn.generate.a_coef_from_matrix(A_trial, i_prop, j_prop)
+        r_diff_trial = r - tn.generate.r_from_matrix(A_trial, i_prop, j_prop)
         return A_trial, r_diff_trial
 
     def edges(A):
@@ -387,7 +393,7 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out', console_output=True,
         return A_trial, r_diff_trial
 
     runtime_start = time()
-    r_diff = r - tn.generate.a_coef_from_matrix(A, i_prop, j_prop)
+    r_diff = r - tn.generate.r_from_matrix(A, i_prop, j_prop)
     if console_output:
         print('\nAssortative mixing of type (', j_prop, ',', i_prop, ')')
         print('|......................................')
@@ -404,7 +410,10 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out', console_output=True,
 
     while abs(r_diff) > precision:
         iteration += 1
-        I, J = np.split(edges(A), 2, axis=1)
+        if (A.sum() % 2) == 0:
+            I, J = np.split(edges(A), 2, axis=1)
+        else:
+            I, J = np.split(edges(A)[:, :-1], 2, axis=1)
         select = selection_criteria(A, I, J, r_diff)
         A_trial, r_diff_trial = reconnect_selection(A, I, J, select)
 
@@ -431,7 +440,71 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out', console_output=True,
     return
 
 
-def a_coef_from_matrix(A, i_prop='in', j_prop='out'):
+def chung_lu_model(K_in, K_out, k_in=None, k_out=None, P_k=None, c=0,
+                   i_prop='in', j_prop='out'):
+    """ Chung Lu style adjacency matrix creation. Generating a target matrix T
+    and compare it with a matrix filled with random variables. Assortativity
+    may be induced by a non-zero c value.
+
+    Parameters
+    ----------
+    K_in : ndarray, 1D int
+        In-degree sequence.
+    K_out : ndarray, 1D int
+        Out-degree sequence.
+    k_in : ndarray, 1D int
+        In-degree space.
+    k_out : ndarray, 1D int
+        Out-degree space.
+    P_k : ndarray, 1D float
+        Joint In-Out-degree probability.
+    c : float
+        Assortativity parameter.
+    i_prop : str
+        Respective node degree which is involved in assortative mixing.
+        ('in' or 'out').
+    j_prop : str
+        Respective node degree which is involved in assortative mixing.
+        ('in' or 'out').
+
+    Returns
+    -------
+    A : ndarray, 2D int
+        Adjacency matrix.
+    """
+
+    N = K_in.shape[0]
+
+    T = np.outer(K_in, K_out) / (N * K_in.mean())
+
+    if c != 0:
+        if None in [k_in, k_out, P_k]:
+            print('Chung Lu model requires k_in, k_out and P_k in order to compute'
+                  ' correct mean values.')
+            quit()
+        P_k_in = P_k.sum(1)
+        P_k_out = P_k.sum(0)
+        k_mean = P_k_in.dot(k_in)
+
+        k_mean_edge_i_in = P_k_in.dot(k_in ** 2) / k_mean
+        k_mean_edge_i_out = (P_k * np.outer(k_in, k_out)).sum() / k_mean
+        k_mean_edge_j_in = k_mean_edge_i_out
+        k_mean_edge_j_out = P_k_out.dot(k_out ** 2) / k_mean
+
+        k_mean_edge_i = eval('k_mean_edge_i_' + i_prop)
+        k_mean_edge_j = eval('k_mean_edge_j_' + j_prop)
+        K_i = eval('K_' + i_prop)
+        K_j = eval('K_' + j_prop)
+
+        T += c * np.outer((K_i - k_mean_edge_i), (K_j - k_mean_edge_j)) \
+            / (N * K_in.mean())
+
+    A = np.random.uniform(size=(N, N)) < T
+
+    return A.astype(int)
+
+
+def r_from_matrix(A, i_prop='in', j_prop='out'):
     """ Compute the assortativity coefficient with respect to chosen
     properties. Connections are from neuron j to i.
 
@@ -473,3 +546,27 @@ def a_coef_from_matrix(A, i_prop='in', j_prop='out'):
     r = cor / (np.sqrt(var_i_prop) * np.sqrt(var_j_prop))
 
     return r
+
+
+def rho_from_matrix(A):
+    """ Compute Pearson correlation coefficient for an adjacency matrix.
+
+    Parameters
+    ----------
+    A : ndarray, 2D int
+        Adjacency matrix.
+
+    Returns
+    -------
+    rho : float
+        Pearson correlation coefficient.
+    """
+
+    K_in = A.sum(1)
+    K_out = A.sum(0)
+
+    rho = tn.generate.rho_from_sequences(K_in, K_out)
+
+    return rho
+
+

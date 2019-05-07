@@ -198,11 +198,11 @@ def correlate_sequences(K_in, K_out, rho):
     K_in.sort()
     N = len(K_in)
 
-    d_rho = correlation_from_sequences(K_in, K_out) - rho
+    d_rho = rho_from_sequences(K_in, K_out) - rho
     while abs(d_rho) > 0.001:
         n = np.random.randint(0, N-1, 2)
         K_out[n] = np.flipud(K_out[n])
-        d_trail = correlation_from_sequences(K_in, K_out) - rho
+        d_trail = rho_from_sequences(K_in, K_out) - rho
         if abs(d_trail) < abs(d_rho):
             d_rho = d_trail
         else:
@@ -211,7 +211,7 @@ def correlate_sequences(K_in, K_out, rho):
     return
 
 
-def correlation_from_sequences(K_in, K_out):
+def rho_from_sequences(K_in, K_out):
     """ Compute Pearson correlation coefficient for two given sequences.
 
     Parameters
