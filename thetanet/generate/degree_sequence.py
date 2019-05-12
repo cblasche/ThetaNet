@@ -1,4 +1,5 @@
 import numpy as np
+import thetanet as tn
 
 
 def degree_sequence_single(k, P_k, N):
@@ -57,7 +58,7 @@ def degree_sequences_match(k_in, P_k_in, k_out, P_k_out):
         return False
 
 
-def degree_sequence_double(k_in, P_k_in, k_out, P_k_out, N):
+def degree_sequence_double(k_in, P_k_in, k_out, P_k_out, N, console_output=True):
     """ Generate two degree sequences that match and can be wired up to form
     a network.
     1) Check if mean values of degrees do match.
@@ -88,7 +89,7 @@ def degree_sequence_double(k_in, P_k_in, k_out, P_k_out, N):
     """
 
     if not degree_sequences_match(k_in, P_k_in, k_out, P_k_out):
-        print('    ERROR: Change degree distributions to fulfill: '
+        print('| ERROR: Change degree distributions to fulfill: '
               'k_in_mean = k_out_mean')
         exit(1)
 
@@ -102,8 +103,11 @@ def degree_sequence_double(k_in, P_k_in, k_out, P_k_out, N):
         if d < 0.01 * N:  # as soon as d is small
             match_degree_sequences(k_in, K_in, k_out, K_out)
             break
-    print('    Found matching out-sequence after', i,
-          'attempts where difference in degrees was', d, '.')
+
+    if console_output:
+        print('| Found sequences after', i,
+              'attempts.')
+        print('| Difference in degrees: ', d)
 
     return K_in, K_out
 
@@ -252,7 +256,8 @@ def swap_pair(x):
     return
 
 
-def degree_sequence(k_in, P_k_in, k_out, P_k_out, N, rho=0):
+def degree_sequence(k_in, P_k_in, k_out, P_k_out, N, rho=0,
+                    console_output=True):
     """ Generate a degree sequence for a directed network.
     In- and out-degrees are drawn with probability P_k from the space k and
     subsequently correlated so they have a Pearson correlation coefficient
@@ -272,6 +277,8 @@ def degree_sequence(k_in, P_k_in, k_out, P_k_out, N, rho=0):
         Number of neurons.
     rho : float
         In-/out-degree correlation.
+    console_output: bool
+        Whether or not to print details to the console.
 
     Returns
     -------
@@ -281,10 +288,72 @@ def degree_sequence(k_in, P_k_in, k_out, P_k_out, N, rho=0):
         Out-degree sequence.
     """
 
-    print('Degree sequence of', N, 'neurons with', int(N*np.dot(k_in, P_k_in)),
-          'connections | Generating:')
-    K_in, K_out = degree_sequence_double(k_in, P_k_in, k_out, P_k_out, N)
+    if console_output:
+        print('\nCreating degree sequence (swap)')
+        print('|......................................')
+        print('| N =', N, 'and N_edges =', np.round(N*k_in.dot(P_k_in), 2))
+        print('|......................................')
+
+    K_in, K_out = degree_sequence_double(k_in, P_k_in, k_out, P_k_out, N,
+                                         console_output=console_output)
     correlate_sequences(K_in, K_out, rho)
-    print('    Successful. \n')
+
+    return K_in, K_out
+
+
+def degree_sequence_copula(P_k, N, k_in, k_out, console_output=True):
+    """ Generate two degree sequences that match and can be wired up to form
+        a network.
+        1) Check if mean values of degrees do match.
+        2) Randomly generate in- and out-degree sequence and check if the
+        difference in degrees is not too large (<1% of N).
+        3) Deterministically change the out-degree sequence.
+
+        Parameters
+        ----------
+        P_k : ndarray, 2D float
+            Joint In-Out-degree probability.
+        N : int
+            Number of neurons.
+        k_in : ndarray, 1D int
+            In-degree space.
+        k_out : ndarray, 1D int
+            Out-degree space.
+        console_output: bool
+            Whether or not to print details to the console.
+
+        Returns
+        -------
+        K_in : ndarray, 1D int
+            In-degree sequence.
+        K_out : ndarray, 1D int
+            Out-degree sequence.
+    """
+
+    if console_output:
+        print('\nCreating degree sequence (copula)')
+        print('|......................................')
+        print('| N =', N, 'and N_edges =', np.round(N*k_in.dot(P_k.sum(1)),2))
+        print('|......................................')
+
+    if not degree_sequences_match(k_in, P_k.sum(1), k_out, P_k.sum(0)):
+        print('| ERROR: Change degree distributions to fulfill: '
+              'k_in_mean = k_out_mean')
+        exit(1)
+
+    d = None  # Difference between the sums of sequences
+    i = 0  # loop count
+    while d != 0:
+        i += 1
+        K_in, K_out = tn.utils.sample_from_bivar_pdf(P_k, N, k_in, k_out)
+        d = abs(K_in.sum() - K_out.sum())
+        if d < 0.01 * N:  # as soon as d is small
+            match_degree_sequences(k_in, K_in, k_out, K_out)
+            break
+
+    if console_output:
+        print('| Found sequences after', i,
+              'attempts.')
+        print('| Difference in degrees: ', d)
 
     return K_in, K_out

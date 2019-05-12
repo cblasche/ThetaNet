@@ -24,18 +24,18 @@ P_k_out = P_k_out / np.sum(P_k_out)  # to have sum(P_k)=1
 k_out_mean = np.sum(k_out * P_k_out)
 
 k = np.outer(k_in, k_out)
-P_k = np.outer(P_k_in, P_k_out)
 if k_in_mean == k_out_mean:
     k_mean = k_in_mean
 
-rho = .4  # in-out-correlation
+rho = .0  # node correlation
+P_k = tn.utils.bivar_pdf_rho(k_in, P_k_in, k_out, P_k_out)(rho)
 
 
 """ Assortativity
 """
 c = 0  # assortativity parameter
-r = 0.0  # assortativity coefficient
-i_prop = 'out'  # post-synaptic neuron property - 'in' / 'out'
+r = 0.3  # assortativity coefficient
+i_prop = 'in'  # post-synaptic neuron property - 'in' / 'out'
 j_prop = 'in'  # pre-synaptic neuron property
 
 
@@ -44,9 +44,9 @@ j_prop = 'in'  # pre-synaptic neuron property
 K_in, K_out = None, None
 A = None
 
-K_in, K_out = tn.generate.degree_sequence(k_in, P_k_in, k_out, P_k_out, N, rho)
-# A = tn.generate.configuration_model(K_in, K_out, r, i_prop, j_prop)
-# A = tn.generate.chung_lu_model(K_in, K_out, rho, c, i_prop, j_prop)
+# K_in, K_out = tn.generate.degree_sequence_copula(P_k, N, k_in, k_out)
+# A = tn.generate.configuration_model(K_in, K_out, r, i_prop, j_prop, simple=True)
+# A = tn.generate.chung_lu_model(K_in, K_out, c, i_prop, j_prop)
 
 
 """ Degree network
@@ -62,7 +62,8 @@ degree_approach_lib = ['full', 'virtual', 'transform']
 degree_approach = degree_approach_lib[1]
 
 a = None
-# a = tn.generate.a_func_linear(k_in, k_out, N, k_mean, c, i_prop, j_prop)
+# a_r = tn.generate.a_func_linear_r(k_in, k_out, P_k, N, i_prop, j_prop)
+# a = a_r(r)
 
 
 """ Virtual degree network
@@ -82,7 +83,8 @@ q_v_out = tn.utils.func_v(q_out, k_out, P_k_out)
 w = np.outer(w_in, w_out)
 
 a_v = None
-a_v = tn.generate.a_func_linear(k_v_in, k_v_out, N, k_mean, c, i_prop, j_prop)
+a_v_r = tn.generate.a_func_linear_r(k_v_in, k_v_out, w, N, i_prop, j_prop)
+a_v = a_v_r(r)
 
 
 

@@ -17,9 +17,9 @@ def bivar_pdf(pdf_y, pdf_z, rho_gauss):
         Probability density function of first variable.
     pdf_z : ndarray, 1D float
         Probability density function of second variable.
-    rho_gauss : float, [-1 ... 1]
+    rho_gauss : float, ]-1 ... 1[
         Covariance of bi-variate normal probability density function.
-        Note: The correlation of samples from the output pdf might be different.
+        Note: The correlation of samples from the output pdf is different.
 
     Returns
     -------
@@ -183,3 +183,48 @@ def correlation_from_pdf(pdf, x0, x1):
     rho = cov / std_x0 / std_x1
 
     return rho
+
+
+def bivar_pdf_rho(y, pdf_y, z, pdf_z):
+    """ Create a function which computes the joint pdf for y and z given the
+    the correlation rho.
+    Can be called like that:
+        pdf_yz = bivar_pdf_rho(y, pdf_y, z, pdf_z)(rho)
+    In contrast to bivar_pdf(pdf_y, pdf_z, rho_gauss) where the correlation
+    of the gauss function is set!
+
+    Parameters
+    ----------
+    y : ndarray, 1D int
+        In-degree space.
+    pdf_y : ndarray, 1D float
+        In-degree probability.
+    z : ndarray, 1D int
+        Out-degree space.
+    pdf_z : ndarray, 1D float
+        Out-degree probability.
+
+    Returns
+    -------
+    pdf_yz_rho : func
+        Takes one argument (rho) and returns pdf_yz.
+    """
+
+    def rho_from_rho_gauss(rho_gauss):
+        pdf_yz = bivar_pdf(pdf_y, pdf_z, rho_gauss=rho_gauss)
+        return correlation_from_pdf(pdf_yz, y, z)
+
+    rho_gauss_arr = np.linspace(-0.99, 0.99, 10)
+    rho_arr = [rho_from_rho_gauss(rho_gauss) for rho_gauss in rho_gauss_arr]
+
+    def pdf_yz_rho(rho):
+        try:
+            rho_gauss = interpolate.interp1d(rho_arr, rho_gauss_arr, kind='cubic')(rho)
+        except ValueError:
+            print('\nCorrelation rho =', rho, 'is out of the interpolation'
+                  ' range. Try smaller absolute values.')
+            quit(1)
+        pdf_yz = bivar_pdf(pdf_y, pdf_z, rho_gauss=rho_gauss)
+        return pdf_yz
+
+    return pdf_yz_rho

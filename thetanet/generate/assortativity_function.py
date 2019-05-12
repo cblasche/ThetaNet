@@ -1,5 +1,6 @@
 import numpy as np
 from scipy import ndimage
+from scipy import interpolate
 import thetanet as tn
 
 """
@@ -52,10 +53,11 @@ def a_func_transform(A, k_in):
     return E, B
 
 
-def a_func_empirical2D(A, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop,
+def a_func_empirical2d(A, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop,
                        smooth_function=True):
     """ Create an assortativity function based on counting connections of an
     adjacency matrix.
+    (Use degree spaces with no gaps.)
 
     Parameters
     ----------
@@ -113,23 +115,20 @@ def a_func_empirical2D(A, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop,
     return a
 
 
-def a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
-    """ Compute the assortativity coefficient from a 2D assortativity function.
-    Reconstruct 'count_func' one would gain from the adjacency matrix first and
-    then compute correlation.
+def r_from_a_func(a, k_in, k_out, P_k, i_prop, j_prop):
+    """ Compute the assortativity coefficient from a 4D assortativity function.
+    Project 4D function to the relevant 2D one and compute r from it.
 
     Parameters
     ----------
-    a : ndarray, 2D float
+    a : ndarray, 4D float
         Assortativity function.
     k_in : ndarray, 1D int
         In-degree space.
-    P_k_in : ndarray, 1D float
-        In-degree probability.
     k_out : ndarray, 1D int
         Out-degree space.
-    P_k_out : ndarray, 1D float
-        Out-degree probability.
+    P_k : ndarray, 2D float
+        Joint In-/Out-degree probability.
     i_prop : str
         Respective node degree which is involved in assortative mixing.
         ('in' or 'out').
@@ -143,11 +142,13 @@ def a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
         Assortativity coefficient.
     """
 
-    # TODO: why can mean over edges be computed like that
-    # averaging in- or out-degrees over sending(j) or receiving(i) side of edges
+    P_k_in = P_k.sum(1)
+    P_k_out = P_k.sum(0)
+    k_mean = P_k_in.dot(k_in)
+
     k_mean_edge_i_in = P_k_in.dot(k_in ** 2) / P_k_in.dot(k_in)
-    k_mean_edge_i_out = P_k_out.dot(k_out)
-    k_mean_edge_j_in = P_k_in.dot(k_in)
+    k_mean_edge_i_out = np.tensordot(P_k, np.outer(k_in, k_out))/k_mean
+    k_mean_edge_j_in = k_mean_edge_i_out
     k_mean_edge_j_out = P_k_out.dot(k_out ** 2) / P_k_out.dot(k_out)
 
     k_i = eval('k_' + i_prop)
@@ -156,6 +157,9 @@ def a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
     P_k_j = eval('P_k_' + j_prop)
     k_mean_edge_i = eval('k_mean_edge_i_' + i_prop)
     k_mean_edge_j = eval('k_mean_edge_j_' + j_prop)
+
+    if len(a.shape) != 2:
+        a = a_func_4d_to_2d(a, P_k_in, P_k_out, i_prop, j_prop)
 
     count_func = a * np.outer(P_k_i, P_k_j)
     mesh_k_i, mesh_k_j = np.meshgrid(k_i, k_j, indexing='ij')
@@ -168,20 +172,16 @@ def a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
     return r
 
 
-def a_coef_from_a_func(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
-    """ Compute the assortativity coefficient from a 4D assortativity function.
-    Project 4D function to the relevant 2D one and compute r from it.
+def a_func_4d_to_2d(a, P_k_in, P_k_out, i_prop, j_prop):
+    """ Sum over irrelevant axes and leave those of i_prop and j_prop.
+    This will reduce a 4d assortativity function to a 2d one.
 
     Parameters
     ----------
     a : ndarray, 4D float
         Assortativity function.
-    k_in : ndarray, 1D int
-        In-degree space.
     P_k_in : ndarray, 1D float
         In-degree probability.
-    k_out : ndarray, 1D int
-        Out-degree space.
     P_k_out : ndarray, 1D float
         Out-degree probability.
     i_prop : str
@@ -193,9 +193,10 @@ def a_coef_from_a_func(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
 
     Returns
     -------
-    r : float
-        Assortativity coefficient.
+    a : float, 2D float
+        Assortativity function.
     """
+
     # choose axis which is to be contracted
     i_mean_axis = {'in': 1, 'out': 0}
     j_mean_axis = {'in': 3, 'out': 2}
@@ -207,16 +208,13 @@ def a_coef_from_a_func(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop):
     a = np.tensordot(a, P_k_j_mean, (j_mean_axis[j_prop], 0))
     a = np.tensordot(a, P_k_i_mean, (i_mean_axis[i_prop], 0))
 
-    r = a_coef_from_a_func2D(a, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop)
-
-    return r
+    return a
 
 
-def a_func_linear(k_in, k_out, N, k_mean, c, i_prop, j_prop):
+def a_func_linear(k_in, k_out, P_k, N, c, i_prop, j_prop):
     """ Assortativity function.
     Based on the linear approach for neutral assortativity and extended with
-    the exponent method to introduce assortativity. Since r cannot be included
-    directly one has to numerically find the parameter to tune assortativity.
+    the addition method to introduce assortativity.
 
     Parameters
     ----------
@@ -224,10 +222,10 @@ def a_func_linear(k_in, k_out, N, k_mean, c, i_prop, j_prop):
         In-degree space.
     k_out : ndarray, 1D float
         Out-degree probability.
+    P_k : ndarray, 2D float
+        Joint In-/Out-degree distribution.
     N : int
         Number of neurons.
-    k_mean : float
-        Mean degree.
     c : float
         Assortativity parameter.
     i_prop : str
@@ -242,6 +240,16 @@ def a_func_linear(k_in, k_out, N, k_mean, c, i_prop, j_prop):
     a : ndarray, 4D float
         Assortativity function.
     """
+
+    P_k_in = P_k.sum(1)
+    P_k_out = P_k.sum(0)
+    k_mean = P_k_in.dot(k_in)
+
+    k_mean_edge_i_in = P_k_in.dot(k_in ** 2) / P_k_in.dot(k_in)
+    k_mean_edge_i_out = np.tensordot(P_k, np.outer(k_in, k_out))/k_mean
+    k_mean_edge_j_in = k_mean_edge_i_out
+    k_mean_edge_j_out = P_k_out.dot(k_out ** 2) / P_k_out.dot(k_out)
+
     if i_prop == 'in':
         i_prop_axis = 0
     elif i_prop == 'out':
@@ -250,7 +258,6 @@ def a_func_linear(k_in, k_out, N, k_mean, c, i_prop, j_prop):
         j_prop_axis = 2
     elif j_prop == 'out':
         j_prop_axis = 3
-
     i_dim_array = np.ones(4, int)
     i_dim_array[i_prop_axis] = -1
     j_dim_array = np.ones(4, int)
@@ -258,47 +265,41 @@ def a_func_linear(k_in, k_out, N, k_mean, c, i_prop, j_prop):
 
     k_i = eval('k_' + i_prop).reshape(i_dim_array)
     k_j = eval('k_' + j_prop).reshape(j_dim_array)
+    k_mean_edge_i = eval('k_mean_edge_i_' + i_prop)
+    k_mean_edge_j = eval('k_mean_edge_j_' + j_prop)
 
     a = k_in[:, None, None, None] * \
         np.ones(len(k_out))[None, :, None, None] * \
         np.ones(len(k_in))[None, None, :, None] * \
         k_out[None, None, None, :]
-    #TODO: check mean values!
-    a += c * (k_j - k_mean) * (k_i - k_mean)
+    a += c * (k_j - k_mean_edge_j) * (k_i - k_mean_edge_i)
     a /= N * k_mean
     a = np.clip(a, 0, 1)
 
     return a
 
 
-def rc_range(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop, j_prop):
+def a_func_linear_r(k_in, k_out, P_k, N, i_prop, j_prop):
     """ Compute the valid range of assortativity parameter c to get the whole
      range of assortativity coefficients r which are possible to reach with
      for this network.
 
     Parameters
     ----------
-    a : function
-        Assortativity function.
     k_in : ndarray, 1D int
         In-degree space.
-    P_k_in : ndarray, 1D float
-        In-degree probability.
     k_out : ndarray, 1D int
         Out-degree space.
-    P_k_out : ndarray, 1D float
-        Out-degree probability.
+    P_k : ndarray, 2D float
+        Joint In-/Out-degree probability.
     N : int
         Number of neurons.
-    k_mean : float
-        Mean degree.
     i_prop : str
         Respective node degree which is involved in assortative mixing.
         ('in' or 'out').
     j_prop : str
         Respective node degree which is involved in assortative mixing.
         ('in' or 'out').
-
 
     Returns
     -------
@@ -308,46 +309,33 @@ def rc_range(a, k_in, P_k_in, k_out, P_k_out, N, k_mean, i_prop, j_prop):
         Array of corresponding assortativity parameters.
     """
 
-    def r(c):
-        return tn.generate.a_coef_from_a_func(a(k_in, k_out, N, k_mean, c,
-                                                i_prop, j_prop), k_in, P_k_in,
-                                              k_out, P_k_out, i_prop, j_prop)
+    def r_from_c(c):
+        a = a_func_linear(k_in, k_out, P_k, N, c, i_prop, j_prop)
+        return r_from_a_func(a, k_in, k_out, P_k, i_prop, j_prop)
 
     c_arr = [0., 1.]
-    r_arr = [r(c) for c in c_arr]
-
+    r_arr = [r_from_c(c) for c in c_arr]
     while r_arr[-1] - r_arr[-2] > 1e-4:
+        print('\r', c_arr[-1], end=' ')
         c_arr.append(0.05 * len(c_arr) / (r_arr[1] - r_arr[0]))
-        r_arr.append(r(c_arr[-1]))
+        r_arr.append(r_from_c(c_arr[-1]))
 
     c_arr = np.asarray(c_arr)
     c_arr_neg = -1 * c_arr[1:][::-1]
-    r_arr_neg = [r(c) for c in c_arr_neg]
+    r_arr_neg = [r_from_c(c) for c in c_arr_neg]
 
     c_arr = np.append(c_arr_neg, c_arr)
     r_arr = np.append(r_arr_neg, r_arr)
     r_arr = np.asarray(r_arr)
 
-    return r_arr, c_arr
+    def a_func(r):
+        try:
+            c = interpolate.interp1d(r_arr, c_arr, kind='cubic')(r)
+        except ValueError:
+            print('\nCorrelation r =', r, 'is out of the interpolation'
+                  ' range. Try smaller absolute values.')
+            quit(1)
+        a = a_func_linear(k_in, k_out, P_k, N, c, i_prop, j_prop)
+        return a
 
-
-def a_param_from_a_coef(r, r_range, c_range):
-    """ Return c value for a given r using the earlier calibrated r_range and
-    c_range.
-
-    Parameters
-    ----------
-    r : float
-        Assortativity coefficient.
-    r_range : ndarray, 1D float
-        Array of assortativity coefficients.
-    c_range : ndarray, 1D float
-        Array of corresponding assortativity parameters.
-
-    Returns
-    -------
-    c : float
-        Assortativity parameter.
-    """
-    c = np.interp(r, r_range, c_range)
-    return c
+    return a_func

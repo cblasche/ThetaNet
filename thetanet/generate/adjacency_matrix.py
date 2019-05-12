@@ -4,7 +4,8 @@ from time import time
 from scipy import interpolate
 
 
-def configuration_model(K_in, K_out, r=0, i_prop='in', j_prop='out'):
+def configuration_model(K_in, K_out, r=0, i_prop='in', j_prop='out',
+                        simple=True, console_output=True):
     """ Compute an adjacency matrix from in- and out-degree sequences using the
     configuration model.
 
@@ -22,6 +23,11 @@ def configuration_model(K_in, K_out, r=0, i_prop='in', j_prop='out'):
     j_prop : str
         Respective node degree which is involved in assortative mixing.
         ('in' or 'out').
+    simple: bool
+        Remove self- and multi-edges if True to create simple network. If False
+        leave the those edges in the network.
+    console_output: bool
+        Whether or not to print details to the console.
 
     Returns
     -------
@@ -29,32 +35,51 @@ def configuration_model(K_in, K_out, r=0, i_prop='in', j_prop='out'):
         Adjacency matrix.
     """
 
-    print('Adjacency matrix - Configuration model | N =', len(K_in),
-          '| K_in = [', min(K_in), ',', max(K_in), '] | K_out = [', min(K_out),
-          ',', max(K_out), '] | r =', r)
+    if console_output:
+        print('\nCreating adjacency matrix: Configuration model')
+        print('|......................................')
+        print('| N =', K_in.shape[0], 'and N_edges =', K_in.sum())
+        print('| k_in = [', min(K_in), ',', max(K_in), ']')
+        print('| k_out = [', min(K_out), ',', max(K_out), ']')
+        if r != 0:
+            print('| r(', j_prop, '-', i_prop, ') =', r)
+        print('|......................................')
+        print('\r| Edge list:', end=' ')
 
-    print('\r    Edge list:', end=' ')
     edges = edges_from_sequence(K_in, K_out)
-    print('Successful.')
 
-    print('\r    Adjacency matrix:', end=' ')
+    if console_output:
+        print('Successful.')
+        print('\r| Adjacency matrix:', end=' ')
+
     A = matrix_from_edges(edges)
-    print('Successful.')
 
-    print('\r    Remove self-edges:', end=' ')
-    remove_self_edges(A)
-    print('Successful.')
+    if console_output:
+        print('Successful.')
+    if simple:
+        if console_output:
+            print('\r| Remove self-edges:', end=' ')
 
-    print('\r    Remove multi-edges:', end=' ')
-    remove_multi_edges(A, console_output=False)
-    print('Successful.')
+        remove_self_edges(A)
+
+        if console_output:
+            print('Successful.')
+            print('\r| Remove multi-edges:', end=' ')
+
+            remove_multi_edges(A, console_output=False)
+
+            print('Successful.')
 
     if r != 0:
-        print('\r    Assortative mixing:')
-        assortative_mixing(A, r, i_prop, j_prop)
-        print('      Successful.')
-
-    print('\n')
+        if console_output:
+            print('\r| Assortative mixing:', end=' ')
+        if simple:
+            assortative_mixing(A, r, i_prop, j_prop, console_output=False)
+        else:
+            assortative_mixing(A, r, i_prop, j_prop, console_output=False,
+                               eliminate_multi_edges=False)
+        if console_output:
+            print('Successful.')
 
     return A
 
