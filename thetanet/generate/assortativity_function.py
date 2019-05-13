@@ -316,7 +316,6 @@ def a_func_linear_r(k_in, k_out, P_k, N, i_prop, j_prop):
     c_arr = [0., 1.]
     r_arr = [r_from_c(c) for c in c_arr]
     while r_arr[-1] - r_arr[-2] > 1e-4:
-        print('\r', c_arr[-1], end=' ')
         c_arr.append(0.05 * len(c_arr) / (r_arr[1] - r_arr[0]))
         r_arr.append(r_from_c(c_arr[-1]))
 

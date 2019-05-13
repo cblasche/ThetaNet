@@ -44,9 +44,9 @@ j_prop = 'in'  # pre-synaptic neuron property
 K_in, K_out = None, None
 A = None
 
-# K_in, K_out = tn.generate.degree_sequence_copula(P_k, N, k_in, k_out)
+K_in, K_out = tn.generate.degree_sequence_copula(P_k, N, k_in, k_out)
 # A = tn.generate.configuration_model(K_in, K_out, r, i_prop, j_prop, simple=True)
-# A = tn.generate.chung_lu_model(K_in, K_out, c, i_prop, j_prop)
+A = tn.generate.chung_lu_model(K_in, K_out, c, i_prop, j_prop)
 
 
 """ Degree network
@@ -111,8 +111,8 @@ Gamma = tn.dynamics.degree_network.Gamma(n)     # coefficients for synaptic
 """ Time
 """
 t_start = 0
-t_end = 10
-t_steps = 100  # write out steps from evolution (not related to precision!)
+t_end = 100
+t_steps = 1000  # write out steps from evolution (not related to precision!)
 t = np.linspace(t_start, t_end, t_steps + 1)
 dt = (t_end - t_start) * 1.0 / t_steps
 

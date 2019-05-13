@@ -77,10 +77,10 @@ def integrate(pm, init=None):
     N_state_variables, Q = NQ_for_approach(pm)
 
     # Initialise network for t=0
-    b_t = 1j * np.zeros((pm.t_steps + 1, N_state_variables))
+    b_t = np.zeros((pm.t_steps + 1, N_state_variables)).astype(complex)
 
     if init is None:
-        init = 1j * np.zeros(N_state_variables)
+        init = np.zeros(N_state_variables)
 
     try:
         init.shape = N_state_variables
@@ -99,7 +99,7 @@ def integrate(pm, init=None):
                          pm.delta, pm.kappa)
 
     # Time integration
-    print('Network with', N_state_variables, 'degrees | Integrating',
+    print('\nNetwork with', N_state_variables, 'degrees | Integrating',
           pm.t_end, 'time units:')
     computation_start = time()
     step = 1
@@ -109,7 +109,6 @@ def integrate(pm, init=None):
         progress = step / pm.t_steps
         tn.utils.progress_bar(progress, time() - computation_start)
         step += 1
-    print('    Successful. \n')
 
     b_t.shape = (b_t.shape[0], Q.shape[0], Q.shape[1])
     return b_t
