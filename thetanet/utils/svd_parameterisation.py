@@ -1,275 +1,313 @@
+from scipy import interpolate
 import numpy as np
 import thetanet as tn
 
 
-def svd_coef_E(A_stack, r_stack, pd_r, pd_k, k_in, m=2):
-    """ Compute coefficients for the reconstruction of an assortativity function
-    of transform-kind for any r within the range of r_stack.
-    This is done starting from a stack of adjacency matrices with different
-    assortativity coefficients. Potentially even an ensemble of realisation of
-    each. The next step is generating transform-assortativity functions for
-    each matrix in A_stack.
-    After Singular Value Decomposition (SVD) is applied to those matrices
-    the basis functions are approximated by polynomials. These polynomials as
-    well as the singular values will be fitted with polynomials through
-    assortativity space, i.e. the assortativity values.
-    The coefficients of that fit are returned and serve as basis for later
-    reconstruction.
+def essentials_from_E(E, c_in, c_out, deg_k=3, m=3):
+    """ Decomposing E with SVD: E = u @ s @ v.T, fit polynomials of order deg_k
+    to the first m basis functions in u and v.
+    Return those coefficients plus singular values s.
 
     Parameters
     ----------
-    A_stack : array_like, 3D/4D int
-        Stack of adjacency matrices with different assortativity coefficients.
-        Potentially several realisation of each (N_ensemble > 1)
-        [(N_ensemble), r, N, N]
-    r_stack : array_like, 1D float
-        Stack of assortativity coefficients corresponding to A_stack.
-    pd_r : int
-        Maximum polynomial degree when fitting along assortativity space
-        (r_stack).
-    pd_k : int
-        Maximum polynomial degree when fitting along degree space.
-    k_in : array_like, 1D int
-        In-degree space.
+    E : ndarray, 2D float
+        Connectivity matrix for degrees flattened of size
+        (N_c_in*N_c_out, N_c_in*N_c_out)
+    c_in : ndarray, 1D float
+        Cluster in-degrees representative.
+    c_out : ndarray, 1D float
+        Cluster out-degrees representative.
+    deg_k : int
+        Order of polynomial fit.
     m : int
-        Order of reconstruction. After applying Singular Value Decomposition
-        the first m functions and singular values will be processed for
-        reconstruction.
+        Rank of approximation.
 
     Returns
     -------
-    coef : list
-        List of coefficients of polynomials to reconstruct SVD-vectors and
-        SVD-values.
+    u_coeff : ndarray, 2D float
+        Coefficients of polynomial fit.
+        Size (m, number of coefficients for deg_k)
+    s : ndarray, 1D float
+        Singular Values. Size (m)
+    v_coeff : ndarray, 2D float
+        Coefficients of polynomial fit.
+        Size (m, number of coefficients for deg_k)
     """
 
-    u, v, s = svd_from_matrix(A_stack, r_stack, k_in, m)
+    def coeff_from_basis_func(f, c_in, c_out, deg_k=3):
+        """ Fit basis function with polynomial of order deg_k and return
+        coefficients.
 
-    # Due to the svd-routine u and v can have different signs when comparing
-    # them between different realisations. In this case they need to be
-    # flipped. (Can be skipped when processing only one adjacency matrix.)
-    if len(u.shape) == 4:
-        correct_signs(u, v)
+        Parameters
+        ----------
+        f : ndarray, 1D or 2D float
+            Basis function or stack of m basis functions.
+        c_in : ndarray, 1D float
+            Cluster in-degrees representative.
+        c_out : ndarray, 1D float
+            Cluster out-degrees representative.
+        deg_k : int
+            Order of polynomial fit.
 
-    u_ens = average_ensemble(u)
-    v_ens = average_ensemble(v)
-    s_ens = average_ensemble(s)
+        Returns
+        -------
+        u : ndarray, 2D float
+            Coefficients of polynomial fit.
+            Size (m, number of coefficients for deg_k)
+        """
+        if len(f.shape) == 2:
+            m = 1
+        if len(f.shape) == 3:
+            m = f.shape[0]
 
-    u_poly = polyfit_k(k_in, u_ens, pd_k)
-    v_poly = polyfit_k(k_in, v_ens, pd_k)
+        A = polynomials_2d(c_in, c_out, deg_k)
+        A = A.reshape(A.shape[0], -1).T
 
-    coef_u = coef_from_polyfit_r(r_stack, u_poly, pd_r)
-    coef_v = coef_from_polyfit_r(r_stack, v_poly, pd_r)
-    coef_s = coef_from_polyfit_r(r_stack, s_ens, pd_r)
-    coef = [coef_u, coef_v, coef_s]
+        coeff = [None] * m
+        for m_i in range(m):
+            coeff[m_i], r, rank, s = np.linalg.lstsq(A, f[m_i].flatten(),
+                                                     rcond=None)
+        return np.asarray(coeff)
 
-    return coef
+    N_c_in = len(c_in)
+    N_c_out = len(c_out)
+
+    u, s, vh = np.linalg.svd(E)
+
+    u = u[:, :m].T
+    v = vh.T[:, :m].T
+    v = v.reshape((m, N_c_in, N_c_out))
+    u = u.reshape((m, N_c_in, N_c_out))
+    s = s[:m]
+
+    u_coeff = coeff_from_basis_func(u, c_in, c_out, deg_k)
+    v_coeff = coeff_from_basis_func(v, c_in, c_out, deg_k)
+
+    return u_coeff, s, v_coeff
 
 
-def svd_E(coef, r):
-    """ Reconstruct E using SVD. The corresponding SVD-values and vectors are
-    reconstructed from polynomials, which's coefficients are stored in coef.
+def polynomials_2d(c_in, c_out, deg_k=3):
+    """ 2d polynomials flattened on [c_in]x[c_out] grid with total number
+    of order up to 'deg'.
 
     Parameters
     ----------
-    coef : list
-        List of coefficients of polynomials to reconstruct svd-vectors and
-        svd-values.
-    r : float
-        Assortativity coefficient which the reconstructed E-matrix shall have.
+    c_in : ndarray, 1D float
+        Representative degree of each cluster.
+    c_out : ndarray, 1D float
+        Representative degree of each cluster.
+    deg_k : int
+        Highest order polynomial.
 
     Returns
     -------
-    E : array_like, 2D float
-        Assortativity function of transformation-kind with assortativity r.
+    A : ndarray, 3D float [polynomial, c_in, c_out]
+        List of polynomials.
+    """
+    # to shift coefficients in a reasonable range divide by k_mean
+    k_mean = np.append(c_in, c_out).mean()
+    X, Y = np.meshgrid(c_in, c_out) / k_mean
+
+    if deg_k == 1:
+        A = np.array([X ** 0,
+                      X, Y])
+    if deg_k == 2:
+        A = np.array([X ** 0,
+                      X, Y,
+                      X ** 2, X * Y, Y ** 2])
+    if deg_k == 3:
+        A = np.array([X ** 0,
+                      X, Y,
+                      X ** 2, X * Y, Y ** 2,
+                      X ** 3, X ** 2 * Y, Y ** 2 * X, Y ** 3])
+    if deg_k == 4:
+        A = np.array([X ** 0,
+                      X, Y,
+                      X ** 2, X * Y, Y ** 2,
+                      X ** 3, X ** 2 * Y, Y ** 2 * X, Y ** 3,
+                      X ** 4, X ** 3 * Y, X ** 2 * Y ** 2, X * Y ** 3, Y ** 4])
+    return A
+
+
+def essential_list_from_data(A_list, r_list, N_c_in, N_c_out, deg_k=3, m=3,
+                             mapping='cumsum'):
+    """ For each transformed degree connectivity E of adjacency matrices
+    in A_list compute the SVD up to rank m. Fit polynomials through basis
+    functions and return them together with the singular values ('essentials').
+
+    Parameters
+    ----------
+    A_list : ndarray, 3D int
+        List of adjacency matrices with different values of assortativity.
+    r_list : ndarray, 1D float
+        List of respective assortativity coefficients.
+    N_c_in : int
+        Number of in-degree clusters
+    N_c_out : int
+        Number of out-degree clusters
+    deg_k : int
+        Order of polynomial fit.
+    m : int
+        Rank of approximation.
+    mapping : str
+        'linear' for equally sized cluster bins or
+        'cumsum' for P_k adapted sized cluster bins for more evenly filled
+         bins.
+
+    Returns
+    -------
+    u_coeff_list : ndarray, 3D float
+        List of coefficients of polynomial fit.
+        Size (N_r, m, number of coefficients for deg_k)
+    s_list : ndarray, 2D float
+        List of singular Values. Size (N_r, m)
+    v_coeff_list : ndarray, 3D float
+        List of coefficients of polynomial fit.
+        Size (N_r, m, number of coefficients for deg_k)
+    """
+    N_r = len(r_list)
+    N_coeff_dict = {0: 1, 1: 3, 2: 6, 3: 10, 4: 15}
+    N_coeff = N_coeff_dict[deg_k]
+
+    u_coeff_list = np.empty((N_r, m, N_coeff))
+    v_coeff_list = np.empty((N_r, m, N_coeff))
+    s_list = np.empty((N_r, m))
+
+    for i in range(N_r):
+        E, B, c_in, c_out = tn.generate.a_func_transform(A_list[i], N_c_in, N_c_out, mapping=mapping)
+        u_coeff_list[i], s_list[i], v_coeff_list[i] = essentials_from_E(E, c_in, c_out, deg_k=deg_k, m=m)
+
+    return u_coeff_list, s_list, v_coeff_list
+
+
+def essential_fit(u_coeff_list, s_list, v_coeff_list, r_list, r):
+    """ Given the list of coefficients and singular values for a series of
+    r's in r_list: fit those values for the assortativity coefficient r.
+
+    Parameters
+    ----------
+    u_coeff_list : ndarray, 3D float
+        List of coefficients of polynomial fit.
+        Size (N_r, m, number of coefficients for deg_k)
+    s_list : ndarray, 2D float
+        List of singular Values. Size (N_r, m)
+    v_coeff_list : ndarray, 3D float
+        List of coefficients of polynomial fit.
+        Size (N_r, m, number of coefficients for deg_k)
+    r_list : ndarray, 1D float
+        Assortativity coefficients.
+    r : float
+        Desired assortativity coefficient.
+
+    Returns
+    -------
+    u_coeff : ndarray, 2D float
+        Coefficients of polynomial fit.
+        Size (m, number of coefficients for deg_k)
+    s : ndarray, 1D float
+        Singular Values. Size (m)
+    v_coeff : ndarray, 2D float
+        Coefficients of polynomial fit.
+        Size (m, number of coefficients for deg_k)
+    """
+    u_coeff_func = interpolate.interp1d(r_list, np.moveaxis(u_coeff_list, 0, -1), kind='cubic')
+    u_coeff = u_coeff_func(r)
+
+    s_func = interpolate.interp1d(r_list, s_list.T, kind='cubic')
+    s = s_func(r)
+
+    v_coeff_func = interpolate.interp1d(r_list, np.moveaxis(v_coeff_list, 0, -1), kind='cubic')
+    v_coeff = v_coeff_func(r)
+
+    return u_coeff, s, v_coeff
+
+
+def usv_from_essentials(u_coeff, s, v_coeff, c_in, c_out):
+    """ Reconstruct basis functions from coefficients and for symmetry reasons
+    pass s through this function.
+
+    Parameters
+    ----------
+    u_coeff : ndarray, 2D float
+        Coefficients of polynomial fit.
+        Size (m, number of coefficients for deg_k)
+    s : ndarray, 1D float
+        Singular Values. Size (m)
+    v_coeff : ndarray, 2D float
+        Coefficients of polynomial fit.
+        Size (m, number of coefficients for deg_k)
+    c_in : ndarray, 1D float
+        Cluster in-degrees representative.
+    c_out : ndarray, 1D float
+        Cluster out-degrees representative.
+
+    Returns
+    -------
+    u : ndarray, 2D float
+        Basis function. Size (m, N_c_in*N_c_out)
+    s : ndarray, 1D float
+        Singular Values. Size (m)
+    v : ndarray, 2D float
+        Basis function. Size (m, N_c_in*N_c_out)
     """
 
-    coef_u, coef_v, coef_s = coef
-    u = func_from_coef(coef_u, r)
-    v = func_from_coef(coef_v, r)
-    s = func_from_coef(coef_s, r)[:, 0]  # Singular values have no degree space
-    E = np.dot(np.dot(u.T, np.diag(s)), v)
+    def basis_func_from_coeff(coeff, c_in, c_out):
+        """ Reconstruct polynomial approximation of basis function.
+
+        Parameters
+        ----------
+        coeff : ndarray, 2D float
+            Coefficients of polynomial fit.
+            Size (m, number of coeffcients for deg_k)
+        c_in : ndarray, 1D float
+            Cluster in-degrees representative.
+        c_out : ndarray, 1D float
+            Cluster out-degrees representative.
+
+        Returns
+        -------
+        f : ndarray, 1D or 2D float
+            Basis function or stack of m basis functions.
+        """
+        m = coeff.shape[0]
+        deg_k_dict = {1: 0, 3: 1, 6: 2, 10: 3, 15: 4}
+        deg_k = deg_k_dict[coeff.shape[1]]
+
+        A = polynomials_2d(c_in, c_out, deg_k)
+
+        f = np.zeros((m, np.prod(A.shape[1:])))
+        for m_i in range(m):
+            f[m_i] = np.tensordot(coeff[m_i], A, axes=(0, 0)).flatten()
+
+        return f
+
+    u = basis_func_from_coeff(u_coeff, c_in, c_out)
+    v = basis_func_from_coeff(v_coeff, c_in, c_out)
+
+    return u, s, v
+
+
+def E_from_usv(u, s, v):
+    """ Reconstruct E from singular values and basis functions.
+
+    Parameters
+    ----------
+    u : ndarray, 2D float
+        Basis function. Size (m, N_c_in*N_c_out)
+    s : ndarray, 1D float
+        Singular Values. Size (m)
+    v : ndarray, 2D float
+        Basis function. Size (m, N_c_in*N_c_out)
+
+    Returns
+    -------
+    E : ndarray, 2D float
+        Reconstructed connectivity matrix for degrees flattened of size
+        (N_c_in*N_c_out, N_c_in*N_c_out)
+    """
+
+    E = (u.T * s) @ v
 
     return E
 
 
-def func_from_coef(coef, r):
-    """ Polynomial reconstruction of functions for a given r.
-
-    Parameters
-    ----------
-    coef : array_like, 3D float
-        Coefficients in ascending degree [Order, PolyDegree_r, (DegreeSpace)]
-    r : float
-        Assortativity coefficient.
-
-    Returns
-    -------
-    f : array_like, 2D
-        Reconstructed basis function or singular value [Number, (DegreeSpace)]
-    """
-
-    f = np.zeros((np.size(coef, 0), np.size(coef, 2)))
-    for pd in range(np.size(coef, 1)):
-        f += coef[:, pd, :] * r ** pd
-
-    return f
-
-
-def coef_from_polyfit_r(r_stack, y, pd_r):
-    """ Fit for each degree of the degree space of basis vecotrs or singular
-    values a polynomial in assortativity(r)-space and return coefficients.
-
-    Parameters
-    ----------
-    r_stack : array_like, 1D float
-        Stack of assortativity coefficients corresponding to A_stack.
-    y : array_like, 3D float
-        Basis functions (recommended to use polynomial approximation)
-        [Order, AssortativitySpace, (DegreeSpace)]
-    pd_r : int
-        Maximum polynomial degree when fitting along assortativity space
-        (r_stack).
-
-    Returns
-    -------
-    coef : array_like, 3D float
-        Coefficients in ascending degree [Order, PolyDegree_r, (DegreeSpace)]
-    """
-
-    coef = np.zeros((np.size(y, 0), pd_r + 1, np.size(y, 2)))
-    for m_i in range(np.size(y, 0)):
-        coef[m_i] = np.polyfit(r_stack, y[m_i], pd_r)[::-1, :]  # coefficients
-        #  come in opposite order
-
-    return coef
-
-
-def polyfit_k(k, y, pd_k):
-    """ Polynomial approximation up to degree pd_k of basis functions y, where
-     y is a stack of different order basis functions and a stack of different r.
-
-    Parameters
-    ----------
-    k : array_like, 1D int
-        Degree space.
-    y : array_like, 3D float
-        Basis functions to be approximated. [Order, AssortativitySpace, DegreeSpace]
-    pd_k : int
-        Maximum polynomial degree when fitting along degree space.
-
-    Returns
-    -------
-    f : array_like, 3D float
-        Polynomial approximation of basis functions.
-        [Order, AssortativitySpace, DegreeSpace]
-    """
-
-    f = np.zeros((np.shape(y)))
-    for m_i in range(np.size(f, 0)):
-        for r_i in range(np.size(f, 1)):
-            nonzero = y[m_i, r_i] != 0  # skip empty entries
-            coef = np.polyfit(k[nonzero], y[m_i, r_i, nonzero], pd_k)
-            f[m_i, r_i] = np.poly1d(coef)(k)
-
-    return f
-
-
-def average_ensemble(f):
-    """ Average ensembles but let only nonzero entries contribute.
-
-    Parameters
-    ----------
-    f : array_like, 3D/4D float
-        SVD basis functions or singular values.
-        [Ensemble, Order, AssortativitySpace, DegreeSpace]
-
-    Returns
-    -------
-    sum : array_like, 2D/3D float
-        Averaged basis function or singular values.
-        [Order, AssortativitySpace, DegreeSpace]
-
-    """
-
-    contributing_ensembles = (f != 0).sum(0)
-    sum = f.sum(0)
-    sum[contributing_ensembles != 0] /= contributing_ensembles[contributing_ensembles != 0]
-
-    return sum
-
-
-def correct_signs(u, v):
-    """ Align signs within the stack of basis functions simultaneously.
-    As a measure use the mean value of u and let this always
-    be positive (without loss of generality).
-
-    Parameters
-    ----------
-    u : array_like, 3D/4D float
-        SVD basis functions (left).
-        [(Ensemble), Order, AssortativitySpace, DegreeSpace]
-    v : array_like, 3D/4D float
-        SVD basis functions (right).
-        [(Ensemble), Order, AssortativitySpace, DegreeSpace]
-
-    Returns
-    -------
-    u and v will be modified.
-    """
-
-    wrong_sign = u.mean(-1) < 0
-    u[wrong_sign] = u[wrong_sign] * (-1)
-    v[wrong_sign] = v[wrong_sign] * (-1)
-
-    return
-
-
-def svd_from_matrix(A_stack, r_stack, k_in, m):
-    """ Apply SVD to each matrix in A_stack and store each basis function
-    u and v and singular values s in a respective large array.
-
-    Parameters
-    ----------
-    A_stack : ndarray, 3D/4D int
-        Stack of adjacency matrices with different assortativity coefficients.
-        Potentially several realisation of each (N_ensemble > 1)
-        [(N_ensemble), r, N, N]
-    r_stack : ndarray, 1D float
-        Stack of assortativity coefficients corresponding to A_stack.
-    k_in : ndarray, 1D int
-        In-degree space.
-    m : int
-        Order of reconstruction. After applying Singular Value Decomposition
-        the first m functions and singular values will be processed for
-        reconstruction.
-
-    Returns
-    -------
-    u : ndarray, 4D float
-        SVD basis functions (left).
-        [Ensemble, Order, AssortativitySpace, DegreeSpace]
-    v : ndarray, 4D float
-        SVD basis functions (right).
-        [Ensemble, Order, AssortativitySpace, DegreeSpace]
-    s : ndarray, 4D float
-        SVD singular values.
-        [Ensemble, Order, AssortativitySpace, 1(needed for following functions)]
-    """
-
-    if len(A_stack.shape) == 3:
-        A_stack = np.expand_dims(A_stack, 0)
-    N_ensemble = A_stack.shape[0]
-
-    u = np.zeros((N_ensemble, m, len(r_stack), len(k_in)))
-    v = np.zeros((N_ensemble, m, len(r_stack), len(k_in)))
-    s = np.zeros((N_ensemble, m, len(r_stack), 1))
-    for n in range(N_ensemble):
-        for r in range(len(r_stack)):
-            E = tn.generate.a_func_transform(A_stack[n, r], k_in)[0]
-            u_nr, s_nr, vh_nr = np.linalg.svd(E)
-            u[n, :, r, :] = u_nr[:, :m].T
-            v[n, :, r, :] = vh_nr.T[:, :m].T
-            s[n, :, r, 0] = s_nr[:m]
-
-    return u, v, s

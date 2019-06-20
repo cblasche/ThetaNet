@@ -10,47 +10,111 @@ holds node degrees of sending neurons.
 """
 
 
-def a_func_transform(A, k_in):
-    """ Create an assortativity function based on the transformation of an
-    adjacency matrix A.
-
-    Combine all neurons with the same in-degree and average.
-    Since some in-degrees may not occur in the particular realisation of this
-    network represented through A, one follows the convention, that E still
-    holds space for the whole in-degree space. As a consequence there will be
-    some zeros in E.
+def a_func_transform(A, N_c_in, N_c_out, k_in=None, P_k_in=None, k_out=None,
+                     P_k_out=None, mapping='cumsum'):
+    """ Based on averaging states with the same degree, a kind of assortativity
+    function can be computed by transforming with E = C @ A @ B.
+    It would be natural to use as many degrees as there are in the network, but
+    if this is too large, we want to bin several degrees into a cluster. The
+    mapping between degrees and clusters can be linear, such that all bins have
+    equal width, or according to the degree probability to have more evenly
+    sized clusters.
 
     Parameters
     ----------
     A : ndarray, 2D int
         Adjacency matrix.
+    N_c_in : int
+        Number of in-degree clusters
+    N_c_out : int
+        Number of out-degree clusters
     k_in : ndarray, 1D int
         In-degree space.
+    P_k_in : ndarray, 1D float
+        In-degree probability.
+    k_out : ndarray, 1D int
+        Out-degree space.
+    P_k_out : ndarray, 1D float
+        Out-degree probability.
+    mapping : str
+        'linear' for equally sized cluster bins or
+        'cumsum' for P_k adapted sized cluster bins for more evenly filled bins.
 
     Returns
     -------
     E : ndarray, 2D float
-        Assortativity function of transformation-kind.
+        Connectivity matrix for degrees flattened of size
+        (N_c_in*N_c_out, N_c_in*N_c_out)
     B : ndarray, 2D float
-        Transformation matrix.
+        Transformation matrix (theta = B @ b) to gain full system back.
+        Size: (N, N_c_in*N_c_out)
+    c_in : ndarray, 1D float
+        Cluster in-degrees representative.
+    c_out : ndarray, 1D float
+        Cluster out-degrees representative.
     """
 
-    K_in = A.sum(1)
-    N = len(K_in)
-    N_k_in = len(k_in)
+    def binning(K, N_c, k, P_k, mapping=mapping):
+        """ Map degree sequence K to their cluster index using respective
+         'mapping' scheme.
 
-    # Lifting operator
-    B = np.zeros((N, N_k_in))
-    B[np.arange(N), K_in - k_in.min()] = 1
+        Parameters
+        ----------
+        K : ndarray, 1D float
+            Degree sequence.
+        N_c : int
+            Number of degree clusters
+        k : ndarray, 1D int
+            Out-degree space.
+        P_k : ndarray, 1D float
+            Degree probability.
+        mapping : str
+            'linear' for equally sized cluster bins or
+            'cumsum' for P_k adapted sized cluster bins for more evenly filled
+             bins.
+
+        Returns
+        -------
+        h : ndarray, 1D int
+            Cluster index. Size N.
+        c : ndarray, 1D float
+            Cluster degrees representative.
+        """
+        if k is None or P_k is None:
+            k, P_k = np.unique(K, return_counts=True)
+            P_k = P_k / N
+
+        if mapping == 'linear':
+            map_func = np.linspace(0, N_c, len(k))
+        if mapping == 'cumsum':
+            map_func = P_k.cumsum() * N_c
+        h = interpolate.interp1d(k, map_func, kind='cubic',
+                                 fill_value=(0, N_c - 1),
+                                 bounds_error=False)(K).astype(int)
+        h = np.clip(h, 0, N_c - 1)
+        c = interpolate.interp1d(map_func, k, kind='cubic')(np.arange(N_c)+0.5)
+
+        return h, c
+
+    N = A.shape[0]
+    K_in = A.sum(1)
+    K_out = A.sum(0)
+
+    h_in, c_in = binning(K_in, N_c_in, k_in, P_k_in, mapping=mapping)
+    h_out, c_out = binning(K_out, N_c_out, k_out, P_k_out, mapping=mapping)
+
+    B = np.zeros((N, N_c_in, N_c_in))
+    B[np.arange(N), h_in, h_out] = 1
+    B.shape = (N, -1)
+
     occurring_degrees = (B.sum(0) != 0)
 
-    # Reduction operator
     C = np.copy(B).T
-    C[occurring_degrees] /= C[occurring_degrees].sum(1)[:, None]
+    C[occurring_degrees] /= C[occurring_degrees].sum(-1)[:, None]
 
-    E = np.matmul(C, np.matmul(A, B))
+    E = C @ A @ B
 
-    return E, B
+    return E, B, c_in, c_out
 
 
 def a_func_empirical2d(A, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop,
@@ -110,7 +174,7 @@ def a_func_empirical2d(A, k_in, P_k_in, k_out, P_k_out, i_prop, j_prop,
     a = count_func / N ** 2 / P_k_i[:, None] / P_k_j[None, :]
 
     if smooth_function:
-        a = ndimage.gaussian_filter(a, [len(k_in)/20, len(k_out)/20])
+        a = ndimage.gaussian_filter(a, [len(k_i)/20, len(k_j)/20])
 
     return a
 
@@ -338,3 +402,69 @@ def a_func_linear_r(k_in, k_out, P_k, N, i_prop, j_prop):
         return a
 
     return a_func
+
+
+def a_func_binom(k_in, k_out, P_k, N, c, i_prop, j_prop):
+    """ Assortativity function.
+    Based on the linear approach for neutral assortativity and extended with
+    the addition method to introduce assortativity.
+
+    Parameters
+    ----------
+    k_in : ndarray, 1D int
+        In-degree space.
+    k_out : ndarray, 1D float
+        Out-degree probability.
+    P_k : ndarray, 2D float
+        Joint In-/Out-degree distribution.
+    N : int
+        Number of neurons.
+    c : float
+        Assortativity parameter.
+    i_prop : str
+        Respective node degree which is involved in assortative mixing.
+        ('in' or 'out').
+    j_prop : str
+        Respective node degree which is involved in assortative mixing.
+        ('in' or 'out').
+
+    Returns
+    -------
+    a : ndarray, 4D float
+        Assortativity function.
+    """
+
+    P_k_in = P_k.sum(1)
+    P_k_out = P_k.sum(0)
+    k_mean = P_k_in.dot(k_in)
+
+    k_mean_edge_i_in = P_k_in.dot(k_in ** 2) / P_k_in.dot(k_in)
+    k_mean_edge_i_out = np.tensordot(P_k, np.outer(k_in, k_out))/k_mean
+    k_mean_edge_j_in = k_mean_edge_i_out
+    k_mean_edge_j_out = P_k_out.dot(k_out ** 2) / P_k_out.dot(k_out)
+
+    if i_prop == 'in':
+        i_prop_axis = 0
+    elif i_prop == 'out':
+        i_prop_axis = 1
+    if j_prop == 'in':
+        j_prop_axis = 2
+    elif j_prop == 'out':
+        j_prop_axis = 3
+    i_dim_array = np.ones(4, int)
+    i_dim_array[i_prop_axis] = -1
+    j_dim_array = np.ones(4, int)
+    j_dim_array[j_prop_axis] = -1
+
+    k_i = eval('k_' + i_prop).reshape(i_dim_array)
+    k_j = eval('k_' + j_prop).reshape(j_dim_array)
+    k_mean_edge_i = eval('k_mean_edge_i_' + i_prop)
+    k_mean_edge_j = eval('k_mean_edge_j_' + j_prop)
+
+    a = 1 - (1 - k_out[None, None, None, :] / (N * k_mean))\
+        ** k_in[:, None, None, None] *\
+        np.ones(len(k_out))[None, :, None, None] *\
+        np.ones(len(k_in))[None, None, :, None]
+    a += c * (k_j - k_mean_edge_j) * (k_i - k_mean_edge_i) / (N * k_mean)
+
+    return a

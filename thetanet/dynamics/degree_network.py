@@ -6,12 +6,12 @@ from time import time
 from thetanet.exceptions import *
 
 """ The in- and output of dynamical_equation and poincare_map use state
-    variables in flat form. It is possible to pass on an array of the flat
+    variables in flat form. It is possible to pass on an array of flattened
     states.
 """
 
 
-def dynamical_equation(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa):
+def dynamical_equation(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa, k_mean):
     """ Mean field description of the Theta neuron model.
 
     Parameters
@@ -36,25 +36,26 @@ def dynamical_equation(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa):
         excitabilities.
     kappa : float
         Coupling constant.
+    k_mean : float
+        Mean degree.
 
     Returns
     -------
     dy/dt : ndarray, 1D float
         Time derivative at time t.
     """
-    y_shape = y.shape
-    y.shape = (Q.shape[0], Q.shape[1]) + y.shape[1:]
 
     P = Gamma[0]
     for p in range(1, n + 1):
         P += Gamma[p] * (y ** p + np.conjugate(y) ** p)
     P *= d_n
-    I = np.tensordot(Q, P, axes=((2, 3), (0, 1)))  # axis 2/3 refers to k^\prime
+    if isinstance(Q, list):
+        I = Q[0].T.dot((Q[1][:, None] * Q[2]).dot(P)) / k_mean  # u, s, v = Q
+    else:
+        I = Q.dot(P) / k_mean
     dydt = -1j * 0.5 * (y - 1) ** 2 + \
            1j * 0.5 * (y + 1) ** 2 * (eta_0 + 1j * delta + kappa * I)
 
-    y.shape = y_shape
-    dydt.shape = y_shape
     return dydt
 
 
@@ -96,7 +97,7 @@ def integrate(pm, init=None):
     network.set_integrator('zvode')
     network.set_initial_value(b_t[0], pm.t_start)
     network.set_f_params(pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0,
-                         pm.delta, pm.kappa)
+                         pm.delta, pm.kappa, pm.k_mean)
 
     # Time integration
     print('\nNetwork with', N_state_variables, 'degrees | Integrating',
@@ -110,7 +111,6 @@ def integrate(pm, init=None):
         tn.utils.progress_bar(progress, time() - computation_start)
         step += 1
 
-    b_t.shape = (b_t.shape[0], Q.shape[0], Q.shape[1])
     return b_t
 
 
@@ -156,21 +156,23 @@ def NQ_for_approach(pm):
     -------
     N_state_variables : int
         Number of state variables.
-    Q : ndarray, 4D
+    Q : ndarray, 2D
         Transition matrix - a weighted assortativity function.
     """
 
     if pm.degree_approach == 'full':
         N_state_variables = pm.N_k_in * pm.N_k_out
-        Q = pm.P_k[None, None, :, :] * pm.a * (pm.N / pm.k_mean)
+        Q = pm.P_k.flatten()[None, :] * pm.N * \
+            pm.a.reshape(N_state_variables, N_state_variables)
 
     elif pm.degree_approach == 'virtual':
         N_state_variables = pm.N_mu_in * pm.N_mu_out
-        Q = pm.w[None, None, :, :] * pm.a_v * (pm.N / pm.k_mean)
+        Q = pm.w.flatten()[None, :] * pm.N * \
+            pm.a_v.reshape(N_state_variables, N_state_variables)
 
     elif pm.degree_approach == 'transform':
-        N_state_variables = pm.N_k_in
-        Q = 1 / pm.k_in_mean * pm.E
+        N_state_variables = pm.N_c_in * pm.N_c_out
+        Q = [pm.u, pm.s, pm.v]
 
     else:
         print('\n "degree_approach" is none of the possible choices',
@@ -180,7 +182,7 @@ def NQ_for_approach(pm):
     return N_state_variables, Q
 
 
-def poincare_map(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa,
+def poincare_map(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa, k_mean,
                  return_time=False):
     """ Perform time integration to the next intersection with poincare section.
 
@@ -189,7 +191,7 @@ def poincare_map(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa,
     t : float
         Time.
     y : ndarray, 1D float
-        State variable. (flattend)
+        State variable. (flattened)
     Gamma: array_like, 1D float
         Factors arising from sophisticated double sum when rewriting the pulse
         function in sinusoidal form.
@@ -197,7 +199,7 @@ def poincare_map(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa,
         Sharpness parameter.
     d_n : float
         Normalisation from pulse function.
-    Q : ndarray, 4D float
+    Q : ndarray, 2D float
         Connectivity matrix determining in-degree/in-degree connections.
     eta_0 : float
         Center of Cauchy distribution of intrinsic excitabilities.
@@ -206,22 +208,23 @@ def poincare_map(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa,
         excitabilities.
     kappa : float
         Coupling constant.
+    k_mean : float
+        Mean degree.
     return_time : bool
         Return elapsed time in addition to updated state variable.
 
     Returns
     -------
     y : ndarray, 2D float [time, degree]
-        Degree states (flattend) at respective times.
+        Degree states (flattened) at respective times.
     """
 
     t0 = np.copy(t)
     y0 = np.copy(y)
 
     def f(t, y):
-        f = tn.dynamics.degree_network.dynamical_equation(t, y, Gamma, n, d_n,
-                                                          Q, eta_0, delta,
-                                                          kappa)
+        f = dynamical_equation(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa,
+                               k_mean)
         return f
 
     def cycle_closed(t, y):

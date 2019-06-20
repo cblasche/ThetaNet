@@ -27,8 +27,9 @@ k = np.outer(k_in, k_out)
 if k_in_mean == k_out_mean:
     k_mean = k_in_mean
 
+P_k_func = tn.utils.bivar_pdf_rho(k_in, P_k_in, k_out, P_k_out)
 rho = .0  # node correlation
-P_k = tn.utils.bivar_pdf_rho(k_in, P_k_in, k_out, P_k_out)(rho)
+P_k = P_k_func(rho)
 
 
 """ Assortativity
@@ -41,11 +42,8 @@ j_prop = 'in'  # pre-synaptic neuron property
 
 """ Node network
 """
-K_in, K_out = None, None
-A = None
-
 K_in, K_out = tn.generate.degree_sequence_copula(P_k, N, k_in, k_out)
-# A = tn.generate.configuration_model(K_in, K_out, r, i_prop, j_prop, simple=True)
+# A = tn.generate.configuration_model(K_in, K_out, r, i_prop, j_prop, simple=False)
 A = tn.generate.chung_lu_model(K_in, K_out, c, i_prop, j_prop)
 
 
@@ -59,11 +57,10 @@ A = tn.generate.chung_lu_model(K_in, K_out, c, i_prop, j_prop)
 # 2: 'transform'- Use Carlo's method to transform the adjacency matrix into
 #               degree space.
 degree_approach_lib = ['full', 'virtual', 'transform']
-degree_approach = degree_approach_lib[1]
+degree_approach = degree_approach_lib[2]
 
-a = None
-# a_r = tn.generate.a_func_linear_r(k_in, k_out, P_k, N, i_prop, j_prop)
-# a = a_r(r)
+a_func = tn.generate.a_func_linear_r(k_in, k_out, P_k, N, i_prop, j_prop)
+a = a_func(r)
 
 
 """ Virtual degree network
@@ -80,24 +77,29 @@ N_mu_out = N_mu_in
 k_v_out, w_out, q_out = tn.utils.three_term_recursion(N_mu_out, k_out, P_k_out)
 q_v_out = tn.utils.func_v(q_out, k_out, P_k_out)
 
-w = np.outer(w_in, w_out)
+w_func = tn.utils.bivar_pdf_rho(k_v_in, w_in, k_v_out, w_out)
+w = w_func(rho)
 
 a_v = None
-a_v_r = tn.generate.a_func_linear_r(k_v_in, k_v_out, w, N, i_prop, j_prop)
-a_v = a_v_r(r)
+a_v_func = tn.generate.a_func_linear_r(k_v_in, k_v_out, w, N, i_prop, j_prop)
+a_v = a_v_func(r)
 
 
 
 """ Transform degree network
 """
-E, B = None, None
-# E, B = tn.generate.a_func_transform(A, k_in)
+N_c_in = 10
+N_c_out = N_c_in
+deg_k = 3  # degree of polynomial fit to basis functions u and v
+m = 3  # svd rank
+mapping = 'cumsum'  # 'cumsum' or 'linear' binning in k-space
+E, B, c_in, c_out = tn.generate.a_func_transform(A, N_c_in, N_c_out, mapping=mapping)
 
 
 """ Neuron dynamics
 """
-kappa = 4.5  # influence strength of other pulses
-eta_0 = -2.6  # center of distribution
+kappa = -4  # influence strength of other pulses
+eta_0 = 2.6  # center of distribution
 delta = 0.1  # width of distribution
 eta = cauchy.rvs(eta_0, delta, size=N)  # Cauchy- aka Lorentz-distribution
 eta = np.clip(eta, eta_0 - 10, eta_0 + 10)
@@ -111,7 +113,7 @@ Gamma = tn.dynamics.degree_network.Gamma(n)     # coefficients for synaptic
 """ Time
 """
 t_start = 0
-t_end = 100
+t_end = 50
 t_steps = 1000  # write out steps from evolution (not related to precision!)
 t = np.linspace(t_start, t_end, t_steps + 1)
 dt = (t_end - t_start) * 1.0 / t_steps
@@ -119,7 +121,7 @@ dt = (t_end - t_start) * 1.0 / t_steps
 
 """ Continuation
 """
-c_lib = ['kappa', 'eta_0', 'delta', 'rho', 'c']
+c_lib = ['kappa', 'eta_0', 'delta', 'rho', 'r']
 c_var = c_lib[4]
 c_ds = 0.5  # step size
 c_steps = 40  # number of steps
