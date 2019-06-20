@@ -3,24 +3,54 @@ import numpy as np
 import thetanet as tn
 
 
-def essentials_from_E(E, c_in, c_out, deg_k=3, m=3):
-    """ Decomposing E with SVD: E = u @ s @ v.T, fit polynomials of order deg_k
-    to the first m basis functions in u and v.
-    Return those coefficients plus singular values s.
+def usv_from_E(E, m=3):
+    """ Decomposing E with SVD: E = u @ s @ v.T.
+    Return those basis function and singular values s up to order m.
 
     Parameters
     ----------
     E : ndarray, 2D float
         Connectivity matrix for degrees flattened of size
         (N_c_in*N_c_out, N_c_in*N_c_out)
+    m : int
+        Rank of approximation.
+
+    Returns
+    -------
+    u : ndarray, 2D float
+        Basis function. Size (m, N_c_in*N_c_out)
+    s : ndarray, 1D float
+        Singular Values. Size (m)
+    v : ndarray, 2D float
+        Basis function. Size (m, N_c_in*N_c_out)
+    """
+    u, s, vh = np.linalg.svd(E)
+
+    u = u[:, :m].T
+    v = vh.T[:, :m].T
+    s = s[:m]
+
+    return u, s, v
+
+
+def essentials_from_usv(u, s, v, c_in, c_out, deg_k):
+    """ Fit polynomials of order deg_k to basis functions u and v.
+    Return those coefficients plus singular values s.
+
+    Parameters
+    ----------
+    u : ndarray, 2D float
+        Basis function. Size (m, N_c_in*N_c_out)
+    s : ndarray, 1D float
+        Singular Values. Size (m)
+    v : ndarray, 2D float
+        Basis function. Size (m, N_c_in*N_c_out)
     c_in : ndarray, 1D float
         Cluster in-degrees representative.
     c_out : ndarray, 1D float
         Cluster out-degrees representative.
     deg_k : int
         Order of polynomial fit.
-    m : int
-        Rank of approximation.
 
     Returns
     -------
@@ -72,13 +102,8 @@ def essentials_from_E(E, c_in, c_out, deg_k=3, m=3):
     N_c_in = len(c_in)
     N_c_out = len(c_out)
 
-    u, s, vh = np.linalg.svd(E)
-
-    u = u[:, :m].T
-    v = vh.T[:, :m].T
-    v = v.reshape((m, N_c_in, N_c_out))
-    u = u.reshape((m, N_c_in, N_c_out))
-    s = s[:m]
+    u.shape = (-1, N_c_in, N_c_out)
+    v.shape = u.shape
 
     u_coeff = coeff_from_basis_func(u, c_in, c_out, deg_k)
     v_coeff = coeff_from_basis_func(v, c_in, c_out, deg_k)
@@ -174,8 +199,12 @@ def essential_list_from_data(A_list, r_list, N_c_in, N_c_out, deg_k=3, m=3,
     s_list = np.empty((N_r, m))
 
     for i in range(N_r):
-        E, B, c_in, c_out = tn.generate.a_func_transform(A_list[i], N_c_in, N_c_out, mapping=mapping)
-        u_coeff_list[i], s_list[i], v_coeff_list[i] = essentials_from_E(E, c_in, c_out, deg_k=deg_k, m=m)
+        E, B, c_in, c_out = tn.generate.a_func_transform(A_list[i], N_c_in,
+                                                         N_c_out,
+                                                         mapping=mapping)
+        usv = usv_from_E(E, m)
+        u_coeff_list[i], s_list[i], v_coeff_list[i] = \
+            essentials_from_usv(*usv, c_in, c_out, deg_k)
 
     return u_coeff_list, s_list, v_coeff_list
 
@@ -210,13 +239,15 @@ def essential_fit(u_coeff_list, s_list, v_coeff_list, r_list, r):
         Coefficients of polynomial fit.
         Size (m, number of coefficients for deg_k)
     """
-    u_coeff_func = interpolate.interp1d(r_list, np.moveaxis(u_coeff_list, 0, -1), kind='cubic')
+    u_coeff_func = interpolate.interp1d(r_list, np.moveaxis(u_coeff_list, 0,
+                                                            -1), kind='cubic')
     u_coeff = u_coeff_func(r)
 
     s_func = interpolate.interp1d(r_list, s_list.T, kind='cubic')
     s = s_func(r)
 
-    v_coeff_func = interpolate.interp1d(r_list, np.moveaxis(v_coeff_list, 0, -1), kind='cubic')
+    v_coeff_func = interpolate.interp1d(r_list, np.moveaxis(v_coeff_list, 0,
+                                                            -1), kind='cubic')
     v_coeff = v_coeff_func(r)
 
     return u_coeff, s, v_coeff
@@ -309,5 +340,3 @@ def E_from_usv(u, s, v):
     E = (u.T * s) @ v
 
     return E
-
-

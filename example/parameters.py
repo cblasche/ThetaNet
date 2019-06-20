@@ -35,7 +35,7 @@ P_k = P_k_func(rho)
 """ Assortativity
 """
 c = 0  # assortativity parameter
-r = 0.3  # assortativity coefficient
+r = 0  # assortativity coefficient
 i_prop = 'in'  # post-synaptic neuron property - 'in' / 'out'
 j_prop = 'in'  # pre-synaptic neuron property
 
@@ -59,8 +59,8 @@ A = tn.generate.chung_lu_model(K_in, K_out, c, i_prop, j_prop)
 degree_approach_lib = ['full', 'virtual', 'transform']
 degree_approach = degree_approach_lib[2]
 
-a_func = tn.generate.a_func_linear_r(k_in, k_out, P_k, N, i_prop, j_prop)
-a = a_func(r)
+# a_func = tn.generate.a_func_linear_r(k_in, k_out, P_k, N, i_prop, j_prop)
+# a = a_func(r)
 
 
 """ Virtual degree network
@@ -69,7 +69,7 @@ a = a_func(r)
 # to a smaller 'virtual' degree space. To be able to use N_mu virtual degrees
 # one needs N_mu+1 polynomials q. The degree probability P_k transforms into
 # N_mu weights w for the virtual degrees.
-N_mu_in = 15
+N_mu_in = 10
 k_v_in, w_in, q_in = tn.utils.three_term_recursion(N_mu_in, k_in, P_k_in)
 q_v_in = tn.utils.func_v(q_in, k_in, P_k_in)
 
@@ -85,8 +85,7 @@ a_v_func = tn.generate.a_func_linear_r(k_v_in, k_v_out, w, N, i_prop, j_prop)
 a_v = a_v_func(r)
 
 
-
-""" Transform degree network
+""" Transformed degree network
 """
 N_c_in = 10
 N_c_out = N_c_in
@@ -94,6 +93,7 @@ deg_k = 3  # degree of polynomial fit to basis functions u and v
 m = 3  # svd rank
 mapping = 'cumsum'  # 'cumsum' or 'linear' binning in k-space
 E, B, c_in, c_out = tn.generate.a_func_transform(A, N_c_in, N_c_out, mapping=mapping)
+usv = tn.utils.usv_from_E(E, m)  # tuple: (u,s,v)
 
 
 """ Neuron dynamics
@@ -113,7 +113,7 @@ Gamma = tn.dynamics.degree_network.Gamma(n)     # coefficients for synaptic
 """ Time
 """
 t_start = 0
-t_end = 50
+t_end = 20
 t_steps = 1000  # write out steps from evolution (not related to precision!)
 t = np.linspace(t_start, t_end, t_steps + 1)
 dt = (t_end - t_start) * 1.0 / t_steps

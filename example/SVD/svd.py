@@ -33,30 +33,27 @@ e_list = tn.utils.essential_list_from_data(A_list, r_list, pm.N_c_in, pm.N_c_out
 # For the dynamics we require u,s,v:
 r = 0.25
 e = tn.utils.essential_fit(*e_list, r_list, r)
-pm.u, pm.s, pm.v = tn.utils.usv_from_essentials(*e, c_in, c_out)
+pm.usv = tn.utils.usv_from_essentials(*e, c_in, c_out)
 # But E can also be computed:
-E = tn.utils.E_from_usv(pm.u, pm.s, pm.v)
-pm.E = E
+E = tn.utils.E_from_usv(*pm.usv)
 
 plt.figure(0)
 b_t = tn.dynamics.degree_network.integrate(pm)[-1000:]
-R = pm.B.dot(b_t.T).mean(0)
+R = B.dot(b_t.T).mean(0)
 plt.plot(R.real, R.imag, label='r=0.25')
 
 
 # Let's compare the dynamics to simulations with r=0.2 and r=0.3.
 pm.A = A_list[2]
-pm.E = tn.generate.a_func_transform(pm.A, pm.N_c_in, pm.N_c_out)[0]
-e = tn.utils.essentials_from_E(pm.E, c_in, c_out, deg_k=pm.deg_k, m=pm.m)
-pm.u, pm.s, pm.v = tn.utils.usv_from_essentials(*e, c_in, c_out)
+E = tn.generate.a_func_transform(pm.A, pm.N_c_in, pm.N_c_out)[0]
+pm.usv = tn.utils.usv_from_E(E, pm.m)
 b_t = tn.dynamics.degree_network.integrate(pm)[-1000:]
 R = B.dot(b_t.T).mean(0)
 plt.plot(R.real, R.imag, label='r=0.2')
 
 pm.A = A_list[3]
-pm.E = tn.generate.a_func_transform(pm.A, pm.N_c_in, pm.N_c_out)[0]
-e = tn.utils.essentials_from_E(pm.E, c_in, c_out, deg_k=pm.deg_k, m=pm.m)
-pm.u, pm.s, pm.v = tn.utils.usv_from_essentials(*e, c_in, c_out)
+E = tn.generate.a_func_transform(pm.A, pm.N_c_in, pm.N_c_out)[0]
+pm.usv = tn.utils.usv_from_E(E, pm.m)
 b_t = tn.dynamics.degree_network.integrate(pm)[-1000:]
 R = pm.B.dot(b_t.T).mean(0)
 plt.plot(R.real, R.imag, label='r=0.3')

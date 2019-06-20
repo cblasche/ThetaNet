@@ -49,7 +49,7 @@ def dynamical_equation(t, y, Gamma, n, d_n, Q, eta_0, delta, kappa, k_mean):
     for p in range(1, n + 1):
         P += Gamma[p] * (y ** p + np.conjugate(y) ** p)
     P *= d_n
-    if isinstance(Q, list):
+    if isinstance(Q, tuple):
         I = Q[0].T.dot((Q[1][:, None] * Q[2]).dot(P)) / k_mean  # u, s, v = Q
     else:
         I = Q.dot(P) / k_mean
@@ -172,7 +172,7 @@ def NQ_for_approach(pm):
 
     elif pm.degree_approach == 'transform':
         N_state_variables = pm.N_c_in * pm.N_c_out
-        Q = [pm.u, pm.s, pm.v]
+        Q = pm.usv
 
     else:
         print('\n "degree_approach" is none of the possible choices',
