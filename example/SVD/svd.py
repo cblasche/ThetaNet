@@ -24,7 +24,7 @@ for i_r in range(len(r_list)):
     tn.generate.assortative_mixing(pm.A, r_list[i_r], 'in', 'in')
     A_list[i_r] = pm.A
 
-e_list = tn.utils.essential_list_from_data(A_list, r_list, pm.N_c_in, pm.N_c_out, m=pm.m, deg_k=pm.deg_k)
+e_list = tn.utils.essential_list_from_data(A_list, pm.N_c_in, pm.N_c_out, m=pm.m, deg_k=pm.deg_k)
 # # If coef needs to be saved, do it in the following way:
 # np.savez('e_list', u=e_list[0], s=e_list[1], v=e_list[2])
 # e_list = np.load('e_list.npz')

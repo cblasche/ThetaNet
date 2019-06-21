@@ -154,7 +154,7 @@ def polynomials_2d(c_in, c_out, deg_k=3):
     return A
 
 
-def essential_list_from_data(A_list, r_list, N_c_in, N_c_out, deg_k=3, m=3,
+def essential_list_from_data(A_list, N_c_in, N_c_out, deg_k=3, m=3,
                              mapping='cumsum'):
     """ For each transformed degree connectivity E of adjacency matrices
     in A_list compute the SVD up to rank m. Fit polynomials through basis
@@ -164,6 +164,7 @@ def essential_list_from_data(A_list, r_list, N_c_in, N_c_out, deg_k=3, m=3,
     ----------
     A_list : ndarray, 3D int
         List of adjacency matrices with different values of assortativity.
+        Size (N_r, N, N)
     r_list : ndarray, 1D float
         List of respective assortativity coefficients.
     N_c_in : int
@@ -190,7 +191,7 @@ def essential_list_from_data(A_list, r_list, N_c_in, N_c_out, deg_k=3, m=3,
         List of coefficients of polynomial fit.
         Size (N_r, m, number of coefficients for deg_k)
     """
-    N_r = len(r_list)
+    N_r = A_list.shape[0]
     N_coeff_dict = {0: 1, 1: 3, 2: 6, 3: 10, 4: 15}
     N_coeff = N_coeff_dict[deg_k]
 
