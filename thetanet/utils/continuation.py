@@ -50,7 +50,7 @@ def continuation(pm, init_b=None, init_x=None, init_stability=None):
             init_b = tn.dynamics.degree_network.poincare_map(0, init_b, pm.Gamma,
                                                              pm.n, pm.d_n, Q,
                                                              pm.eta_0, pm.delta,
-                                                             pm.kappa)
+                                                             pm.kappa, pm.k_mean)
         init_x = eval('pm.' + pm.c_var)
         init_stability = True
 
@@ -139,7 +139,6 @@ def continuation(pm, init_b=None, init_x=None, init_stability=None):
         pass
 
     b = comp_unit(b_x[:, :-1].T).T
-    b.shape = (b.shape[0], Q.shape[0], Q.shape[1])
     x = b_x[:, -1]
 
     return b, x, stable
@@ -166,25 +165,23 @@ def init_dyn(pm):
 
     if pm.c_var in ['kappa', 'eta_0', 'delta']:
         def dyn(b, x):
-            Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
             setattr(locals()['pm'], pm.c_var, x)
+            Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
             args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
-                    pm.kappa)
+                    pm.kappa, pm.k_mean)
             if pm.c_pmap:
                 return poi_map(*args)-b
             else:
                 return dyn_equ(*args)
 
-    if pm.c_var in ['rho', 'c']:
+    if pm.c_var in ['rho', 'r']:
         if pm.degree_approach == 'full':
             def dyn(b, x):
                 setattr(locals()['pm'], pm.c_var, x)
-                pm.a = tn.generate.a_func_linear(pm.k_in, pm.k_out, pm.N,
-                                                 pm.k_mean, pm.c,
-                                                 pm.i_prop, pm.j_prop)
-                Q = pm.P_k[None, None, :, :] * pm.a * (pm.N / pm.k_mean)
+                pm.a = pm.a_func(pm.r)
+                Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
                 args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
-                        pm.kappa)
+                        pm.kappa, pm.k_mean)
                 if pm.c_pmap:
                     return poi_map(*args)-b
                 else:
@@ -193,12 +190,23 @@ def init_dyn(pm):
         elif pm.degree_approach == 'virtual':
             def dyn(b, x):
                 setattr(locals()['pm'], pm.c_var, x)
-                pm.a_v = tn.generate.a_func_linear(pm.k_v_in, pm.k_v_out, pm.N,
-                                                   pm.k_mean, pm.c,
-                                                   pm.i_prop, pm.j_prop)
-                Q = pm.w[None, None, :, :] * pm.a_v * (pm.N / pm.k_mean)
+                pm.a_v = pm.a_v_func(pm.r)
+                Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
                 args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
-                        pm.kappa)
+                        pm.kappa, pm.k_mean)
+                if pm.c_pmap:
+                    return poi_map(*args)-b
+                else:
+                    return dyn_equ(*args)
+
+        elif pm.degree_approach == 'transform':
+            def dyn(b, x):
+                setattr(locals()['pm'], pm.c_var, x)
+                e = tn.utils.essential_fit(*pm.e_list, pm.r_list, pm.r)
+                pm.usv = tn.utils.usv_from_essentials(*e, pm.c_in, pm.c_out)
+                Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
+                args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
+                        pm.kappa, pm.k_mean)
                 if pm.c_pmap:
                     return poi_map(*args)-b
                 else:
@@ -267,10 +275,8 @@ def partial_b(f, b_x, dh=1e-6):
     fb = f(b, x)[:, None] * np.ones(b_h.shape)
     try:
         df_db = (f(b_h, x) - fb) / dh
-        print('\n atempt')
     except ValueError:
-        print('\n loop')
-        df_db = 1j*np.zeros(b_h.shape)
+        df_db = np.zeros(b_h.shape, dtype=complex)
         for col in range(df_db.shape[1]):
             df_db[:, col] = (f(b_h[:, col], x) - fb[:, col]) / dh
     df_db = real_stack(df_db)
@@ -441,8 +447,8 @@ def pmap_period(b, x, pm):
 
     Parameters
     ----------
-    b : ndarray, 3D complex
-        Curve of fixed points. [Curve, States(2D]
+    b : ndarray, 2D complex
+        Curve of fixed points. [Curve, States]
     x : ndarray, 1D float
     pm : parameter.py
         Parameter file.
@@ -456,12 +462,30 @@ def pmap_period(b, x, pm):
     periods = np.zeros(x.shape)
     for i in range(x.shape[0]):
         setattr(locals()['pm'], pm.c_var, x[i])
-        pm.a_v = tn.generate.a_func_linear(pm.k_v_in, pm.k_v_out, pm.N,
-                                           pm.k_mean, pm.c,
-                                           pm.i_prop, pm.j_prop)
-        Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
-        args = (0, b[i].ravel(), pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
-                pm.kappa)
+
+        if pm.degree_approach == 'full':
+            pm.a = tn.generate.a_func_linear(pm.k_in, pm.k_out, pm.P_k,
+                                             pm.N, pm.c,
+                                             pm.i_prop, pm.j_prop)
+            Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
+            args = (0, b[i], pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
+                    pm.kappa, pm.k_mean)
+
+        elif pm.degree_approach == 'virtual':
+            pm.a_v = tn.generate.a_func_linear(pm.k_v_in, pm.k_v_out, pm.w,
+                                               pm.N, pm.c,
+                                               pm.i_prop, pm.j_prop)
+            Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
+            args = (0, b[i], pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
+                    pm.kappa, pm.k_mean)
+
+        elif pm.degree_approach == 'transform':
+            e = tn.utils.essential_fit(*pm.e_list, pm.r_list, pm.r)
+            pm.usv = tn.utils.usv_from_essentials(*e, pm.c_in, pm.c_out)
+            Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
+            args = (0, b[i], pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
+                    pm.kappa, pm.k_mean)
+
         periods[i] = tn.dynamics.degree_network.\
             poincare_map(*args, return_time=True)[1]
 

@@ -14,8 +14,9 @@ versa.
 
 bx, x, stable = tn.utils.continuation(pm)
 periods = tn.utils.pmap_period(bx, x, pm)
-R = np.tensordot(pm.w, bx, axes=((0, 1), (1, 2)))
+R = pm.w.flatten().dot(bx.T)
 
 plt.figure(1)
 plt.scatter(x, periods, c=stable)
+# plt.scatter(R.real, x, c=stable)
 plt.show()

@@ -25,10 +25,12 @@ for i_r in range(len(r_list)):
     A_list[i_r] = pm.A
 
 e_list = tn.utils.essential_list_from_data(A_list, pm.N_c_in, pm.N_c_out, m=pm.m, deg_k=pm.deg_k)
-# # If coef needs to be saved, do it in the following way:
-# np.savez('e_list', u=e_list[0], s=e_list[1], v=e_list[2])
-# e_list = np.load('e_list.npz')
-# e_list = e_list['u'], e_list['s'], e_list['v']
+# To save it, do it the following way:
+# np.savez('svd_data', u=e_list[0], s=e_list[1], v=e_list[2], r_list=r_list, c_in=c_in, c_out=c_out)
+# svd = np.load('svd_data.npz')
+# e_list = svd['u'], svd['s'], svd['v']
+# r_list = svd['r_list']
+# c_in, c_out = svd['c_in'], svd['c_out']
 
 # For the dynamics we require u,s,v:
 r = 0.25

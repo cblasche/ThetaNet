@@ -51,19 +51,20 @@ A = tn.generate.chung_lu_model(K_in, K_out, c, i_prop, j_prop)
 """
 # There are different approaches to translate the neuronal network in its
 # mean field description:
-# 0: 'full'     - Compute the state for each degree of the network using an
+# 0: 'full'     - Compute the state for each degree of the network using a
 #               designed assortativity function.
 # 1: 'virtual'  - See 'full' but for a reduced set of degrees.
 # 2: 'transform'- Use Carlo's method to transform the adjacency matrix into
-#               degree space.
+#               degree space / or sparse degree space.
 degree_approach_lib = ['full', 'virtual', 'transform']
 degree_approach = degree_approach_lib[2]
 
+""" Degree approach: full
+"""
 # a_func = tn.generate.a_func_linear_r(k_in, k_out, P_k, N, i_prop, j_prop)
 # a = a_func(r)
 
-
-""" Virtual degree network
+""" Degree approach: virtual
 """
 # The degree space can be reduced due to the smooth nature of the state function
 # to a smaller 'virtual' degree space. To be able to use N_mu virtual degrees
@@ -80,13 +81,10 @@ q_v_out = tn.utils.func_v(q_out, k_out, P_k_out)
 w_func = tn.utils.bivar_pdf_rho(k_v_in, w_in, k_v_out, w_out)
 w = w_func(rho)
 
-a_v = None
 a_v_func = tn.generate.a_func_linear_r(k_v_in, k_v_out, w, N, i_prop, j_prop)
 a_v = a_v_func(r)
 
-
-
-""" Transform degree network
+""" Degree approach: transform
 """
 N_c_in = 10
 N_c_out = N_c_in
@@ -94,6 +92,7 @@ deg_k = 3  # degree of polynomial fit to basis functions u and v
 m = 3  # svd rank
 mapping = 'cumsum'  # 'cumsum' or 'linear' binning in k-space
 E, B, c_in, c_out = tn.generate.a_func_transform(A, N_c_in, N_c_out, mapping=mapping)
+usv = tn.utils.usv_from_E(E, m)
 
 
 """ Neuron dynamics
