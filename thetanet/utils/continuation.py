@@ -4,7 +4,8 @@ import time
 from thetanet.exceptions import *
 
 
-def continuation(pm, init_b=None, init_x=None, init_stability=None):
+def continuation(pm, init_b=None, init_x=None, init_stability=None,
+                 adaptive_steps=True):
     """ Continuation scheme.
     Trace out a curve stable or unstable fixed points by continuing an initial
     solution under variation of the chosen variable pm.c_var.
@@ -19,7 +20,8 @@ def continuation(pm, init_b=None, init_x=None, init_stability=None):
         Initial condition for continuation parameter.
     init_stability: bool
         True if fixed point is stable, False if not.
-
+    adaptive_steps : bool
+        In- or decrease step size c_ds when appropriate.
 
     Returns
     -------
@@ -113,10 +115,11 @@ def continuation(pm, init_b=None, init_x=None, init_stability=None):
                     raise ConvergenceError(i)
 
             # Adaptive step size - depending on speed of convergence
-            if n_i < 2:
-                pm.c_ds *= 1.5
-            if n_i > 3:
-                pm.c_ds /= 1.5
+            if adaptive_steps:
+                if n_i < 2:
+                    pm.c_ds *= 1.5
+                if n_i > 3:
+                    pm.c_ds /= 1.5
 
             # Stability (larges eigenvalue less than 0)
             stable[i] = np.max(np.linalg.eig(j[:, :-1])[0].real) < 0

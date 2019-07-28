@@ -240,15 +240,18 @@ def essential_fit(u_coeff_list, s_list, v_coeff_list, r_list, r):
         Coefficients of polynomial fit.
         Size (m, number of coefficients for deg_k)
     """
-    u_coeff_func = interpolate.interp1d(r_list, np.moveaxis(u_coeff_list, 0,
-                                                            -1), kind='cubic')
+    u_coeff_func = interpolate.interp1d(r_list, np.moveaxis(u_coeff_list, 0, -1)
+                                        , kind='cubic',
+                                        fill_value='extrapolate')
     u_coeff = u_coeff_func(r)
 
-    s_func = interpolate.interp1d(r_list, s_list.T, kind='cubic')
+    s_func = interpolate.interp1d(r_list, s_list.T, kind='cubic',
+                                  fill_value='extrapolate')
     s = s_func(r)
 
-    v_coeff_func = interpolate.interp1d(r_list, np.moveaxis(v_coeff_list, 0,
-                                                            -1), kind='cubic')
+    v_coeff_func = interpolate.interp1d(r_list, np.moveaxis(v_coeff_list, 0, -1)
+                                        , kind='cubic',
+                                        fill_value='extrapolate')
     v_coeff = v_coeff_func(r)
 
     return u_coeff, s, v_coeff

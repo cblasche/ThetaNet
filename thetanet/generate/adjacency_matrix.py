@@ -450,7 +450,7 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out', console_output=True,
         # target r. If so, the sign in r_diff changes.
         # In this case no further iteration is required, since we can achieve
         # the desired r by reducing the amount of selected edge pairs.
-        if np.sign(r_diff_trial) != np.sign(r_diff):
+        if abs(r_diff) > precision and np.sign(r_diff_trial) != np.sign(r_diff):
             A_trial, r_diff_trial = refine_selection(A, I, J, select, r_diff,
                                                      r_diff_trial)
 
