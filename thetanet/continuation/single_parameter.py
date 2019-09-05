@@ -1,12 +1,12 @@
-import numpy as np
 import thetanet as tn
-import time
 from thetanet.exceptions import *
+from thetanet.continuation.utils import *
+import time
 
 
 def continuation(pm, init_b=None, init_x=None, init_stability=None,
                  adaptive_steps=True):
-    """ Continuation scheme.
+    """ Pseudo arc-length continuation scheme.
     Trace out a curve stable or unstable fixed points by continuing an initial
     solution under variation of the chosen variable pm.c_var.
 
@@ -92,7 +92,7 @@ def continuation(pm, init_b=None, init_x=None, init_stability=None,
             # Converge back to stability with Newton scheme
             for n_i in range(pm.c_n):
                 try:
-                    j = jacobian(dyn, b_x[i])
+                    j = jacobian(dyn, b_x[i], dh=1e-6)
                 except NoPeriodicOrbitException:
                     raise NoPeriodicOrbitException(i)
                 db_x = real_stack(dyn(comp_unit(b_x[i, :-1]), b_x[i, -1]))
@@ -148,7 +148,8 @@ def continuation(pm, init_b=None, init_x=None, init_stability=None,
 
 
 def init_dyn(pm):
-    """ Depending on the choice of degree approach and continuation variable
+    """
+    Depending on the choice of degree approach and continuation variable
     the dynamical equations might need some other parameters updated.
 
     Parameters
@@ -218,29 +219,9 @@ def init_dyn(pm):
     return dyn
 
 
-def null_vector(A):
-    """ Compute normalised null vector to a given matrix A.
-    The null vector fulfills A(null) = 0.
-
-    Parameters
-    ----------
-    A : ndarray, 2D float
-        Matrix.
-
-    Returns
-    -------
-    null : ndarray, 1D float
-        Null vector, normalised.
-    """
-
-    null = nullspace(A)[:, -1]
-    null /= (np.sqrt(np.dot(null, null)))
-
-    return null
-
-
 def partial_b(f, b_x, dh=1e-6):
-    """ Compute partial derivative of f with respect to b.
+    """
+    Compute partial derivative of f with respect to b.
     The states b come in real_stack version and need to be made complex first.
     The derivative is computed as a simple difference quotient.
 
@@ -288,7 +269,8 @@ def partial_b(f, b_x, dh=1e-6):
 
 
 def partial_x(f, b_x, dh=1e-6):
-    """ Compute partial derivative of f with respect to variable x.
+    """
+    Compute partial derivative of f with respect to variable x.
     The states b come in real_stack version and need to be made complex first.
     The derivative is computed as a simple difference quotient.
 
@@ -317,8 +299,9 @@ def partial_x(f, b_x, dh=1e-6):
     return df_dx
 
 
-def jacobian(f, b_x):
-    """ Compute Jacobi matrix containing the derivatives of f with respect to
+def jacobian(f, b_x, dh=1e-6):
+    """
+    Compute Jacobi matrix containing the derivatives of f with respect to
     all states and the continuation variable x.
 
     Parameters
@@ -327,6 +310,8 @@ def jacobian(f, b_x):
         Dynamical equation.
     b_x : ndarray, 1D float
         States(real), variable.
+    dh : float
+        Infinitesimal step size.
 
     Returns
     -------
@@ -338,15 +323,16 @@ def jacobian(f, b_x):
          [dfn_db1, dfn_db2, ..., dfn_dbn, dfn_dx]]
     """
 
-    df_db = partial_b(f, b_x)
-    df_dx = partial_x(f, b_x)
+    df_db = partial_b(f, b_x, dh=dh)
+    df_dx = partial_x(f, b_x, dh=dh)
     j = np.append(df_db, df_dx[:, None], 1)  # add df_dx as a last column
 
     return j
 
 
 def newton_step(j, null, db_x, x_constrain):
-    """ Stepping down a gradient in Newton-method fashion and enforcing a
+    """
+    Stepping down a gradient in Newton-method fashion and enforcing a
     constrain on x.
 
     Parameters
@@ -373,80 +359,9 @@ def newton_step(j, null, db_x, x_constrain):
     return n_step
 
 
-def real_stack(x):
-    """ Split a complex variable x into two parts and stack it to have a twice
-    twice as long real variable.
-
-    Parameters
-    ----------
-    x : ndarray, complex
-
-    Returns
-    -------
-    x : ndarray, real
-    """
-    return np.append(x.real, x.imag, axis=0)
-
-
-def comp_unit(x):
-    """ Reverse process of real_stack. Add second half of variable x as
-    imaginary part to real first half.
-
-    Parameters
-    ----------
-    x : ndarray, real
-
-    Returns
-    -------
-    x : ndarray, complex
-    """
-    return x[:int(x.shape[0]/2)] + 1j * x[int(x.shape[0]/2):]
-
-
-def nullspace(A, atol=1e-14, rtol=0):
-    """ Compute an approximate basis for the nullspace of A.
-
-    The algorithm used by this function is based on the singular value
-    decomposition of `A`.
-
-    Parameters
-    ----------
-    A : ndarray
-        A should be at most 2-D.  A 1-D array with length k will be treated
-        as a 2-D with shape (1, k)
-    atol : float
-        The absolute tolerance for a zero singular value.  Singular values
-        smaller than `atol` are considered to be zero.
-    rtol : float
-        The relative tolerance.  Singular values less than rtol*smax are
-        considered to be zero, where smax is the largest singular value.
-
-    If both `atol` and `rtol` are positive, the combined tolerance is the
-    maximum of the two; that is::
-        tol = max(atol, rtol * smax)
-    Singular values smaller than `tol` are considered to be zero.
-
-    Return value
-    ------------
-    ns : ndarray
-        If `A` is an array with shape (m, k), then `ns` will be an array
-        with shape (k, n), where n is the estimated dimension of the
-        nullspace of `A`.  The columns of `ns` are a basis for the
-        nullspace; each element in numpy.dot(A, ns) will be approximately
-        zero.
-    """
-
-    A = np.atleast_2d(A)
-    u, s, vh = np.linalg.svd(A)
-    tol = max(atol, rtol * s[0])
-    nnz = (s >= tol).sum()
-    ns = vh[nnz:].conj().T
-
-    return ns
-
-
 def pmap_period(b, x, pm):
-    """ Compute period times of poincare maps.
+    """
+    Compute period times of poincare maps.
 
     Parameters
     ----------
