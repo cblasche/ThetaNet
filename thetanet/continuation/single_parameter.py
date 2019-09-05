@@ -4,7 +4,7 @@ from thetanet.continuation.utils import *
 import time
 
 
-def continuation(pm, init_b=None, init_x=None, init_stability=None,
+def single_param(pm, init_b=None, init_x=None, init_stability=None,
                  adaptive_steps=True):
     """ Pseudo arc-length continuation scheme.
     Trace out a curve stable or unstable fixed points by continuing an initial

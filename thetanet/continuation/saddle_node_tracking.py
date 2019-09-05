@@ -4,7 +4,7 @@ from thetanet.continuation.utils import *
 import time
 
 
-def continuation_sn(pm, init_b, init_x, init_y, adaptive_steps=True):
+def saddle_node(pm, init_b, init_x, init_y, adaptive_steps=True):
     """
     Pseudo arc-length saddle-node bifurcation continuation scheme.
     A saddle-node which occurred when varying x (pm.c_var) will be continued
