@@ -4,7 +4,7 @@ from thetanet.continuation.utils import *
 import time
 
 
-def saddle_node(pm, init_b, init_x, init_y, adaptive_steps=True):
+def saddle_node(pm, init_b, init_x, init_y):
     """
     Pseudo arc-length saddle-node bifurcation continuation scheme.
     A saddle-node which occurred when varying x (pm.c_var) will be continued
@@ -24,8 +24,6 @@ def saddle_node(pm, init_b, init_x, init_y, adaptive_steps=True):
     init_y: float
         Initial condition for second continuation parameter - pseudo arc-length
         continuation will be done on that one.
-    adaptive_steps : bool
-        In- or decrease step size pm.c_ds when appropriate.
 
     Returns
     -------
@@ -40,13 +38,15 @@ def saddle_node(pm, init_b, init_x, init_y, adaptive_steps=True):
     # Number of state variables
     N = tn.dynamics.degree_network.NQ_for_approach(pm)[0]
 
-    dh1 = 1e-8
-    dh2 = 1e-8
+    # Precision for difference quotient
+    dh1 = 1e-4  # general purpose
+    dh2 = 1e-8  # for outer difference in directional derivative
+
     # Minimal step size when algorithm should stop
     ds_min = 0.1 * abs(pm.c_ds)
 
     # Initialise continuation
-    init_b = tn.utils.real_stack(init_b)
+    init_b = real_stack(init_b)
     bnxy = np.zeros((pm.c_steps + 1, 2 * 2 * N + 2))
     bnxy[0, :2*N] = init_b
     bnxy[0, -2] = init_x
@@ -63,10 +63,10 @@ def saddle_node(pm, init_b, init_x, init_y, adaptive_steps=True):
     bnxy[0, 2*N:4*N] = init_n
 
     # Converge with Newton method to saddle-point
-    for n_i in range(7):
+    for n_i in range(pm.c_n):
         j = jacobian_sn(dyn, bnxy[0], dh1=dh1, dh2=dh2)
-        f = dyn_sn(dyn, bnxy[0], j[:2 * N, :2 * N])
-        bnxy[0, :-1] -= np.linalg.solve(j[:, :-1], f)
+        g = dyn_sn(dyn, bnxy[0], j[:2 * N, :2 * N])
+        bnxy[0, :-1] -= np.linalg.solve(j[:, :-1], g)
 
     # To get the scheme started compute an initial null vector - the direction
     # of the first step. This should be done such that the change in c_var is
@@ -89,11 +89,11 @@ def saddle_node(pm, init_b, init_x, init_y, adaptive_steps=True):
                 # Converge back to stability with Newton scheme
                 for n_i in range(pm.c_n):
                     j = jacobian_sn(dyn, bnxy[i], dh1=dh1, dh2=dh2)
-                    f = dyn_sn(dyn, bnxy[i], j[:2 * N, :2 * N])
+                    g = dyn_sn(dyn, bnxy[i], j[:2 * N, :2 * N])
                     # Constrain on y to ensure the solution stays on plane
                     # orthogonal to null vector and distance ds.
                     y_constrain = (bnxy[i] - bnxy[i - 1]).dot(null) - pm.c_ds
-                    n_step = newton_step_sn(j, null, f, y_constrain)
+                    n_step = newton_step_sn(j, null, g, y_constrain)
 
                     bnxy[i] -= n_step
 
@@ -103,18 +103,15 @@ def saddle_node(pm, init_b, init_x, init_y, adaptive_steps=True):
                         break
 
                 # Adaptive step size - depending on speed of convergence
-                if adaptive_steps:
-                    if n_i < 2:
-                        pm.c_ds *= 1.5
-                    if n_i > 3:
-                        pm.c_ds /= 1.5
+                if n_i < 2:
+                    pm.c_ds *= 1.5
+                if n_i > 3:
+                    pm.c_ds /= 1.5
 
                 if abs(pm.c_ds) < ds_min:
                     print("\nStep", i, "did not converge using minimal stepsize"
                                        " of " + str(ds_min) + "!")
                     raise ConvergenceError(i)
-
-            print(i, np.round(bnxy[i, -1], 3), np.round(pm.c_ds, 3))
 
             # Update null vector and make sure direction is roughly the same as
             # previous one
@@ -132,7 +129,7 @@ def saddle_node(pm, init_b, init_x, init_y, adaptive_steps=True):
         bnxy = bnxy[:final_step]
         pass
 
-    b, x, y = comp_unit(bnxy[:, :-1].T).T, bnxy[:, -2], bnxy[:, -1]
+    b, x, y = comp_unit(bnxy[:, :-2].T).T, bnxy[:, -2], bnxy[:, -1]
 
     return b, x, y
 
@@ -143,7 +140,7 @@ def dyn_sn(dyn, bnxy, j):
 
        dyn(b,x,y) = 0  # dynamical equation at b
             j @ n = 0  # j being the jacobian j = df/db, n being the null vector
-        ||n|| - 1 = 0  # length of null vector
+          n^2 - 1 = 0  # length of null vector
 
     Note that the jacobian computed in the scheme includes more derivatives
     and only the upper left corner is df/db.
@@ -170,7 +167,7 @@ def dyn_sn(dyn, bnxy, j):
     g = np.empty(4*N+1)
     g[:2*N] = real_stack(dyn(comp_unit(b), x, y))
     g[2*N:4*N] = j @ n
-    g[-1] = np.linalg.norm(n) - 1
+    g[-1] = n.dot(n) - 1
 
     return g
 
@@ -453,7 +450,7 @@ def jacobian_sn(f, bnxy, dh1=1e-6, dh2=1e-6):
          =
         [[ df_db,    0,         df_dx,     df_dy    ],
          [djn_db,    df_db,     djn_dx,    djn_dy   ],
-         [0,         n/|n|,     0,         0        ]]
+         [0,         2*n,       0,         0        ]]
     """
 
     N = int((bnxy.shape[0] - 2) / 4)
@@ -474,7 +471,7 @@ def jacobian_sn(f, bnxy, dh1=1e-6, dh2=1e-6):
     j[2*N:4*N, 2*N:4*N] = df_db
     j[2*N:4*N, -2] = djn_dx
     j[2*N:4*N, -1] = djn_dy
-    j[-1, 2*N:4*N] = n / np.linalg.norm(n)
+    j[-1, 2*N:4*N] = 2*n
 
     return j
 

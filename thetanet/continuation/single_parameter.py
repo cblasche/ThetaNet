@@ -4,9 +4,9 @@ from thetanet.continuation.utils import *
 import time
 
 
-def single_param(pm, init_b=None, init_x=None, init_stability=None,
-                 adaptive_steps=True):
-    """ Pseudo arc-length continuation scheme.
+def single_param(pm, init_b=None, init_x=None, init_stability=None):
+    """
+    Pseudo arc-length continuation scheme.
     Trace out a curve stable or unstable fixed points by continuing an initial
     solution under variation of the chosen variable pm.c_var.
 
@@ -20,8 +20,6 @@ def single_param(pm, init_b=None, init_x=None, init_stability=None,
         Initial condition for continuation parameter.
     init_stability: bool
         True if fixed point is stable, False if not.
-    adaptive_steps : bool
-        In- or decrease step size c_ds when appropriate.
 
     Returns
     -------
@@ -39,6 +37,12 @@ def single_param(pm, init_b=None, init_x=None, init_stability=None,
         exit(1)
 
     N_state_variables, Q = tn.dynamics.degree_network.NQ_for_approach(pm)
+
+    # Precision for difference quotient
+    dh = 1e-8
+
+    # Minimal step size when algorithm should stop
+    ds_min = 0.1 * abs(pm.c_ds)
 
     # Initialise continuation
     b_x = np.zeros((pm.c_steps + 1, 2 * N_state_variables + 1))
@@ -76,50 +80,55 @@ def single_param(pm, init_b=None, init_x=None, init_stability=None,
     # To get the scheme started compute an initial null vector - the direction
     # of the first step. This should be done such that the change in c_var is
     # of the same sign as c_ds.
-    j = jacobian(dyn, b_x[0])
+    j = jacobian(dyn, b_x[0], dh=dh)
     null = null_vector(j)
     if np.sign(null[-1]) < 0:
         null *= -1
 
-    print('Network with', N_state_variables, 'degrees | Continuation of',
-          pm.c_steps, 'steps:')
+    print('Network with', N_state_variables, 'degrees | Single-Parameter-'
+          'Continuation of', pm.c_steps, 'steps:')
     t_start = time.time()
     try:
         for i in range(1, pm.c_steps+1):
-            # Step forward along null vector
-            b_x[i] = b_x[i - 1] + null * pm.c_ds
+            do_newton = True
+            while do_newton:
 
-            # Converge back to stability with Newton scheme
-            for n_i in range(pm.c_n):
-                try:
-                    j = jacobian(dyn, b_x[i], dh=1e-6)
-                except NoPeriodicOrbitException:
-                    raise NoPeriodicOrbitException(i)
-                db_x = real_stack(dyn(comp_unit(b_x[i, :-1]), b_x[i, -1]))
-                # Constrain on x to ensure the solution stays on plane
-                # orthogonal to null vector and distance ds.
-                x_constrain = (b_x[i] - b_x[i-1]).dot(null) - pm.c_ds
-                n_step = newton_step(j, null, db_x, x_constrain)
+                # Step forward along null vector
+                b_x[i] = b_x[i - 1] + null * pm.c_ds
 
-                b_x[i] = b_x[i] - n_step
+                # Converge back to stability with Newton scheme
+                for n_i in range(pm.c_n):
+                    try:
+                        j = jacobian(dyn, b_x[i], dh=dh)
+                    except NoPeriodicOrbitException:
+                        raise NoPeriodicOrbitException(i)
+                    db_x = real_stack(dyn(comp_unit(b_x[i, :-1]), b_x[i, -1]))
+                    # Constrain on x to ensure the solution stays on plane
+                    # orthogonal to null vector and distance ds.
+                    x_constrain = (b_x[i] - b_x[i-1]).dot(null) - pm.c_ds
+                    n_step = newton_step(j, null, db_x, x_constrain)
 
-                # if Newton's method is exact enough break
-                if np.abs(n_step).sum() < 1e-5:
-                    break
-                if n_i == (pm.c_n - 1):
-                    if i is 1 and not pm.c_pmap:
-                        print("\nCheck if there is a periodic orbit and if so"
-                              " use poincare map. (c_pmap=True)")
-                        exit(1)
-                    print("\nStep", i, "did not converge!")
-                    raise ConvergenceError(i)
+                    b_x[i] = b_x[i] - n_step
 
-            # Adaptive step size - depending on speed of convergence
-            if adaptive_steps:
+                    # if Newton's method is exact enough break
+                    if np.abs(n_step).sum() < 1e-5:
+                        do_newton = False
+                        break
+
+                # Adaptive step size - depending on speed of convergence
                 if n_i < 2:
                     pm.c_ds *= 1.5
                 if n_i > 3:
                     pm.c_ds /= 1.5
+
+                if abs(pm.c_ds) < ds_min:
+                    if i is 1 and not pm.c_pmap:
+                        print("\nCheck if there is a periodic orbit and if so"
+                              " use poincare map. (c_pmap=True)")
+                        exit(1)
+                    print("\nStep", i, "did not converge using minimal stepsize"
+                                       " of " + str(ds_min) + "!")
+                    raise ConvergenceError(i)
 
             # Stability (larges eigenvalue less than 0)
             stable[i] = np.max(np.linalg.eig(j[:, :-1])[0].real) < 0
