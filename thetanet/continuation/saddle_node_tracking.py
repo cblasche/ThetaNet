@@ -4,7 +4,7 @@ from thetanet.continuation.utils import *
 import time
 
 
-def saddle_node(pm, init_b, init_x, init_y):
+def saddle_node(pm, init_b, init_x, init_y, init_bnxy=None, bnxy_output=False):
     """
     Pseudo arc-length saddle-node bifurcation continuation scheme.
     A saddle-node which occurred when varying x (pm.c_var) will be continued
@@ -24,6 +24,10 @@ def saddle_node(pm, init_b, init_x, init_y):
     init_y: float
         Initial condition for second continuation parameter - pseudo arc-length
         continuation will be done on that one.
+    init_bnxy : ndarray, 1D float
+        Full initial condition including null vector.
+    bnxy_output : bool
+        Return the full bnxy array if True.
 
     Returns
     -------
@@ -43,24 +47,26 @@ def saddle_node(pm, init_b, init_x, init_y):
     dh2 = 1e-8  # for outer difference in directional derivative
 
     # Minimal step size when algorithm should stop
-    ds_min = 0.1 * abs(pm.c_ds)
-
-    # Initialise continuation
-    init_b = real_stack(init_b)
-    bnxy = np.zeros((pm.c_steps + 1, 2 * 2 * N + 2))
-    bnxy[0, :2*N] = init_b
-    bnxy[0, -2] = init_x
-    bnxy[0, -1] = init_y
+    ds_min = 0.01 * abs(pm.c_ds)
 
     # Determine dynamical equation
     dyn = init_dyn_sn(pm)
 
-    # Determine eigenvector with eigenvalue with zero real part
-    df_db = f_partial_b_sn(dyn, init_b, init_x, init_y, dh=dh1)
-    df_dx = f_partial_x_sn(dyn, init_b, init_x, init_y, dh=dh1)
-    init_n = np.linalg.solve(df_db, -df_dx)
-    init_n /= np.linalg.norm(init_n)
-    bnxy[0, 2*N:4*N] = init_n
+    # Initialise continuation
+    bnxy = np.zeros((pm.c_steps + 1, 2 * 2 * N + 2))
+    if bnxy_output:
+        bnxy[0] = init_bnxy
+    else:
+        init_b = real_stack(init_b)
+        # Determine eigenvector with eigenvalue with zero real part
+        df_db = f_partial_b_sn(dyn, init_b, init_x, init_y, dh=dh1)
+        df_dx = f_partial_x_sn(dyn, init_b, init_x, init_y, dh=dh1)
+        init_n = np.linalg.solve(df_db, -df_dx)
+        init_n /= np.linalg.norm(init_n)
+        bnxy[0, :2*N] = init_b
+        bnxy[0, 2*N:4*N] = init_n
+        bnxy[0, -2] = init_x
+        bnxy[0, -1] = init_y
 
     # Converge with Newton method to saddle-point
     for n_i in range(pm.c_n):
@@ -129,9 +135,11 @@ def saddle_node(pm, init_b, init_x, init_y):
         bnxy = bnxy[:final_step]
         pass
 
-    b, x, y = comp_unit(bnxy[:, :-2].T).T, bnxy[:, -2], bnxy[:, -1]
-
-    return b, x, y
+    if bnxy_output:
+        return bnxy
+    else:
+        b, x, y = comp_unit(bnxy[:, :-2].T).T, bnxy[:, -2], bnxy[:, -1]
+        return b, x, y
 
 
 def dyn_sn(dyn, bnxy, j):
