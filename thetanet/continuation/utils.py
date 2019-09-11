@@ -1,4 +1,5 @@
 import numpy as np
+import thetanet as tn
 
 
 def null_vector(A):
@@ -21,38 +22,6 @@ def null_vector(A):
     null /= (np.sqrt(np.dot(null, null)))
 
     return null
-
-
-def real_stack(x):
-    """
-    Split a complex variable x into two parts and stack it to have a twice
-    twice as long real variable.
-
-    Parameters
-    ----------
-    x : ndarray, complex
-
-    Returns
-    -------
-    x : ndarray, real
-    """
-    return np.append(x.real, x.imag, axis=0)
-
-
-def comp_unit(x):
-    """
-    Reverse process of real_stack. Add second half of variable x as
-    imaginary part to real first half.
-
-    Parameters
-    ----------
-    x : ndarray, real
-
-    Returns
-    -------
-    x : ndarray, complex
-    """
-    return x[:int(x.shape[0]/2)] + 1j * x[int(x.shape[0]/2):]
 
 
 def nullspace(A, atol=1e-14, rtol=0):
@@ -96,3 +65,172 @@ def nullspace(A, atol=1e-14, rtol=0):
     ns = vh[nnz:].conj().T
 
     return ns
+
+
+def real_stack(x):
+    """
+    Split a complex variable x into two parts and stack it to have a twice
+    twice as long real variable.
+
+    Parameters
+    ----------
+    x : ndarray, complex
+
+    Returns
+    -------
+    x : ndarray, real
+    """
+    return np.append(x.real, x.imag, axis=0)
+
+
+def comp_unit(x):
+    """
+    Reverse process of real_stack. Add second half of variable x as
+    imaginary part to real first half.
+
+    Parameters
+    ----------
+    x : ndarray, real
+
+    Returns
+    -------
+    x : ndarray, complex
+    """
+    return x[:int(x.shape[0]/2)] + 1j * x[int(x.shape[0]/2):]
+
+
+def newton_step(j, null, g, y_constrain):
+    """
+    Stepping down a gradient in Newton-method fashion and enforcing a
+    constrain on y.
+
+    Parameters
+    ----------
+    j : ndarray, 2D float
+        Jacobi matrix.
+    null : ndarray, 1D float
+        Null vector of j.
+    g : ndarray, 1D float
+        Set of dynamical equations evaluated at current position.
+    y_constrain : float
+        Constrain on y to ensure the solution stays on plane orthogonal to
+        null vector and distance ds.
+
+    Returns
+    -------
+    n_step : ndarray, 1D float
+        Newton step.
+    """
+
+    m = np.append(j, null[None, :], 0)  # add null as last row
+    n_step = np.linalg.solve(m, np.append(g, y_constrain))
+
+    return n_step
+
+
+def init_dyn_1(pm):
+    """
+    Depending on the choice of degree approach and continuation variable
+    the dynamical equations might need some other parameters updated.
+
+    Parameters
+    ----------
+    pm : parameter.py
+        Parameter file.
+
+    Returns
+    -------
+    dyn : function
+        Dynamical equation.
+    """
+
+    from thetanet.dynamics.degree_network import dynamical_equation \
+        as dyn_equ
+    from thetanet.dynamics.degree_network import poincare_map as poi_map
+
+    if pm.c_var in ['kappa', 'eta_0', 'delta']:
+        def dyn(b, x):
+            setattr(locals()['pm'], pm.c_var, x)
+            Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
+            args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
+                    pm.kappa, pm.k_mean)
+            if pm.c_pmap:
+                return poi_map(*args)-b
+            else:
+                return dyn_equ(*args)
+
+    if pm.c_var in ['rho', 'r']:
+        if pm.degree_approach == 'full':
+            def dyn(b, x):
+                setattr(locals()['pm'], pm.c_var, x)
+                pm.a = pm.a_func(pm.r)
+                Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
+                args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
+                        pm.kappa, pm.k_mean)
+                if pm.c_pmap:
+                    return poi_map(*args)-b
+                else:
+                    return dyn_equ(*args)
+
+        elif pm.degree_approach == 'virtual':
+            def dyn(b, x):
+                setattr(locals()['pm'], pm.c_var, x)
+                pm.a_v = pm.a_v_func(pm.r)
+                Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
+                args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
+                        pm.kappa, pm.k_mean)
+                if pm.c_pmap:
+                    return poi_map(*args)-b
+                else:
+                    return dyn_equ(*args)
+
+        elif pm.degree_approach == 'transform':
+            def dyn(b, x):
+                setattr(locals()['pm'], pm.c_var, x)
+                e = tn.utils.essential_fit(*pm.e_list, pm.r_list, pm.r)
+                pm.usv = tn.utils.usv_from_essentials(*e, pm.c_in, pm.c_out)
+                Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
+                args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
+                        pm.kappa, pm.k_mean)
+                if pm.c_pmap:
+                    return poi_map(*args)-b
+                else:
+                    return dyn_equ(*args)
+
+    return dyn
+
+
+def init_dyn_2(pm):
+    """ Depending on the choice of degree approach and continuation variables
+    the dynamical equations might need some other parameters updated.
+
+    Parameters
+    ----------
+    pm : parameter.py
+        Parameter file.
+
+    Returns
+    -------
+    dyn : function
+        Dynamical equation.
+    """
+
+    from thetanet.dynamics.degree_network import dynamical_equation \
+        as dyn_equ
+    from thetanet.dynamics.degree_network import poincare_map as poi_map
+
+    def dyn(b, x, y):
+        setattr(locals()['pm'], pm.c_var, x)
+        setattr(locals()['pm'], pm.c_var2, y)
+        e = tn.utils.essential_fit(*pm.e_list, pm.r_list, pm.r)
+        pm.usv = tn.utils.usv_from_essentials(*e, pm.c_in, pm.c_out)
+        Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
+        args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
+                pm.kappa, pm.k_mean)
+        if pm.c_pmap:
+            return poi_map(*args)-b
+        else:
+            return dyn_equ(*args)
+
+    return dyn
+

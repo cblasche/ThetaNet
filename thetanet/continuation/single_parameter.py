@@ -1,6 +1,6 @@
 import thetanet as tn
 from thetanet.exceptions import *
-from thetanet.continuation.utils import *
+from thetanet.continuation import *
 import time
 
 
@@ -75,7 +75,7 @@ def single_param(pm, init_b=None, init_x=None, init_stability=None):
     stable[0] = init_stability
 
     # Determine dynamical equation
-    dyn = init_dyn(pm)
+    dyn = init_dyn_1(pm)
 
     # To get the scheme started compute an initial null vector - the direction
     # of the first step. This should be done such that the change in c_var is
@@ -102,11 +102,11 @@ def single_param(pm, init_b=None, init_x=None, init_stability=None):
                         j = jacobian(dyn, b_x[i], dh=dh)
                     except NoPeriodicOrbitException:
                         raise NoPeriodicOrbitException(i)
-                    db_x = real_stack(dyn(comp_unit(b_x[i, :-1]), b_x[i, -1]))
+                    g = real_stack(dyn(comp_unit(b_x[i, :-1]), b_x[i, -1]))
                     # Constrain on x to ensure the solution stays on plane
                     # orthogonal to null vector and distance ds.
                     x_constrain = (b_x[i] - b_x[i-1]).dot(null) - pm.c_ds
-                    n_step = newton_step(j, null, db_x, x_constrain)
+                    n_step = newton_step(j, null, g, x_constrain)
 
                     b_x[i] = b_x[i] - n_step
 
@@ -156,158 +156,6 @@ def single_param(pm, init_b=None, init_x=None, init_stability=None):
     return b, x, stable
 
 
-def init_dyn(pm):
-    """
-    Depending on the choice of degree approach and continuation variable
-    the dynamical equations might need some other parameters updated.
-
-    Parameters
-    ----------
-    pm : parameter.py
-        Parameter file.
-
-    Returns
-    -------
-    dyn : function
-        Dynamical equation.
-    """
-
-    from thetanet.dynamics.degree_network import dynamical_equation \
-        as dyn_equ
-    from thetanet.dynamics.degree_network import poincare_map as poi_map
-
-    if pm.c_var in ['kappa', 'eta_0', 'delta']:
-        def dyn(b, x):
-            setattr(locals()['pm'], pm.c_var, x)
-            Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
-            args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
-                    pm.kappa, pm.k_mean)
-            if pm.c_pmap:
-                return poi_map(*args)-b
-            else:
-                return dyn_equ(*args)
-
-    if pm.c_var in ['rho', 'r']:
-        if pm.degree_approach == 'full':
-            def dyn(b, x):
-                setattr(locals()['pm'], pm.c_var, x)
-                pm.a = pm.a_func(pm.r)
-                Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
-                args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
-                        pm.kappa, pm.k_mean)
-                if pm.c_pmap:
-                    return poi_map(*args)-b
-                else:
-                    return dyn_equ(*args)
-
-        elif pm.degree_approach == 'virtual':
-            def dyn(b, x):
-                setattr(locals()['pm'], pm.c_var, x)
-                pm.a_v = pm.a_v_func(pm.r)
-                Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
-                args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
-                        pm.kappa, pm.k_mean)
-                if pm.c_pmap:
-                    return poi_map(*args)-b
-                else:
-                    return dyn_equ(*args)
-
-        elif pm.degree_approach == 'transform':
-            def dyn(b, x):
-                setattr(locals()['pm'], pm.c_var, x)
-                e = tn.utils.essential_fit(*pm.e_list, pm.r_list, pm.r)
-                pm.usv = tn.utils.usv_from_essentials(*e, pm.c_in, pm.c_out)
-                Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
-                args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
-                        pm.kappa, pm.k_mean)
-                if pm.c_pmap:
-                    return poi_map(*args)-b
-                else:
-                    return dyn_equ(*args)
-
-    return dyn
-
-
-def partial_b(f, b_x, dh=1e-6):
-    """
-    Compute partial derivative of f with respect to b.
-    The states b come in real_stack version and need to be made complex first.
-    The derivative is computed as a simple difference quotient.
-
-    Parameters
-    ----------
-    f : function
-        Dynamical equation.
-    b_x : ndarray, 1D float
-        States(real), variable.
-    dh : float
-        Infinitesimal step size.
-
-    Returns
-    -------
-    df_db : ndarray, 2D float
-        Partial derivative with respect to b.(real)
-        [[df1_db1, df1_db2, ..., df1_dbn],
-         [df2_db1, df2_db2, ..., df2_dbn],
-          ...      ...      ...  ...
-         [dfn_db1, dfn_db2, ..., dfn_dbn]]
-    """
-
-    b, x = b_x[:-1], b_x[-1]
-
-    b = np.outer(b, np.ones(b.shape[0]))
-    h = np.diag(np.full(b.shape[0], dh))
-    b_h = b + h
-
-    b = comp_unit(b[:, 0])
-    b_h = comp_unit(b_h)
-
-    # Try to process matrix at once - much faster. For poincare maps (using
-    # scipy.integrate.solve_ivp internally) this can't be done. In this case
-    # slice the matrix and process column wise.
-    fb = f(b, x)[:, None] * np.ones(b_h.shape)
-    try:
-        df_db = (f(b_h, x) - fb) / dh
-    except ValueError:
-        df_db = np.zeros(b_h.shape, dtype=complex)
-        for col in range(df_db.shape[1]):
-            df_db[:, col] = (f(b_h[:, col], x) - fb[:, col]) / dh
-    df_db = real_stack(df_db)
-
-    return df_db
-
-
-def partial_x(f, b_x, dh=1e-6):
-    """
-    Compute partial derivative of f with respect to variable x.
-    The states b come in real_stack version and need to be made complex first.
-    The derivative is computed as a simple difference quotient.
-
-    Parameters
-    ----------
-    f : function
-        Dynamical equation.
-    b_x : ndarray, 1D float
-        States(real), variable.
-    dh : float
-        Infinitesimal step size.
-
-    Returns
-    -------
-    df_dx : ndarray, 1D float
-        Partial derivative with respect to x.(real)
-        [df1_dx, df2_dx, ..., dfn_dx]
-    """
-
-    b, x = b_x[:-1], b_x[-1]
-
-    b = comp_unit(b)
-    df_dx = (f(b, x+dh) - f(b, x)) / dh
-    df_dx = real_stack(df_dx)
-
-    return df_dx
-
-
 def jacobian(f, b_x, dh=1e-6):
     """
     Compute Jacobi matrix containing the derivatives of f with respect to
@@ -332,40 +180,11 @@ def jacobian(f, b_x, dh=1e-6):
          [dfn_db1, dfn_db2, ..., dfn_dbn, dfn_dx]]
     """
 
-    df_db = partial_b(f, b_x, dh=dh)
-    df_dx = partial_x(f, b_x, dh=dh)
+    df_db = f_partial_b_1(f, b_x, dh=dh)
+    df_dx = f_partial_x_1(f, b_x, dh=dh)
     j = np.append(df_db, df_dx[:, None], 1)  # add df_dx as a last column
 
     return j
-
-
-def newton_step(j, null, db_x, x_constrain):
-    """
-    Stepping down a gradient in Newton-method fashion and enforcing a
-    constrain on x.
-
-    Parameters
-    ----------
-    j : ndarray, 2D float
-        Jacobi matrix.
-    null : ndarray, 1D float
-        Null vector.
-    db_x : ndarray, 1D float
-        Dynamical direction (dyn(b_x)).
-    x_constrain : float
-        Constrain on x to ensure the solution stays on plane orthogonal to
-        null vector and distance ds.
-
-    Returns
-    -------
-    n_step : ndarray, 1D float
-        Newton step.
-    """
-
-    m = np.append(j, null[None, :], 0)  # add null as last row
-    n_step = np.linalg.solve(m, np.append(db_x, x_constrain))
-
-    return n_step
 
 
 def pmap_period(b, x, pm):
