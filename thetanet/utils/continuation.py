@@ -92,7 +92,7 @@ def continuation(pm, init_b=None, init_x=None, init_stability=None,
             # Converge back to stability with Newton scheme
             for n_i in range(pm.c_n):
                 try:
-                    j = jacobian(dyn, b_x[i])
+                    j = jacobian(dyn, b_x[i], dh=1e-6)
                 except NoPeriodicOrbitException:
                     raise NoPeriodicOrbitException(i)
                 db_x = real_stack(dyn(comp_unit(b_x[i, :-1]), b_x[i, -1]))
@@ -317,7 +317,7 @@ def partial_x(f, b_x, dh=1e-6):
     return df_dx
 
 
-def jacobian(f, b_x):
+def jacobian(f, b_x, dh=1e-6):
     """ Compute Jacobi matrix containing the derivatives of f with respect to
     all states and the continuation variable x.
 
@@ -327,6 +327,8 @@ def jacobian(f, b_x):
         Dynamical equation.
     b_x : ndarray, 1D float
         States(real), variable.
+    dh : float
+        Infinitesimal step size.
 
     Returns
     -------
@@ -338,8 +340,8 @@ def jacobian(f, b_x):
          [dfn_db1, dfn_db2, ..., dfn_dbn, dfn_dx]]
     """
 
-    df_db = partial_b(f, b_x)
-    df_dx = partial_x(f, b_x)
+    df_db = partial_b(f, b_x, dh=dh)
+    df_dx = partial_x(f, b_x, dh=dh)
     j = np.append(df_db, df_dx[:, None], 1)  # add df_dx as a last column
 
     return j
