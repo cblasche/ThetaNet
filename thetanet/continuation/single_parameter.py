@@ -4,7 +4,8 @@ from thetanet.continuation import *
 import time
 
 
-def single_param(pm, init_b=None, init_x=None, init_stability=None):
+def single_param(pm, init_b=None, init_x=None, init_stability=None,
+                 adaptive_step_size=True, dh=1e-8):
     """
     Pseudo arc-length continuation scheme.
     Trace out a curve stable or unstable fixed points by continuing an initial
@@ -14,12 +15,16 @@ def single_param(pm, init_b=None, init_x=None, init_stability=None):
     ----------
     pm : parameter.py
         Parameter file.
-    init_b : ndarray, 2D float
+    init_b : ndarray, 2D complex
         Initial conditions for states followed by continuation variable.
     init_x : float
         Initial condition for continuation parameter.
     init_stability: bool
         True if fixed point is stable, False if not.
+    adaptive_step_size: bool
+        Adjust step size pm.c_ds according to speed of convergence if True.
+    dh : float
+        Precision when building difference quotient.
 
     Returns
     -------
@@ -38,11 +43,10 @@ def single_param(pm, init_b=None, init_x=None, init_stability=None):
 
     N_state_variables, Q = tn.dynamics.degree_network.NQ_for_approach(pm)
 
-    # Precision for difference quotient
-    dh = 1e-8
-
     # Minimal step size when algorithm should stop
-    ds_min = 0.1 * abs(pm.c_ds)
+    ds_min = 0.01 * abs(pm.c_ds)
+    # Maximal step size which should not be exceeded
+    ds_max = 100 * abs(pm.c_ds)
 
     # Initialise continuation
     b_x = np.zeros((pm.c_steps + 1, 2 * N_state_variables + 1))
@@ -116,19 +120,24 @@ def single_param(pm, init_b=None, init_x=None, init_stability=None):
                         break
 
                 # Adaptive step size - depending on speed of convergence
-                if n_i < 2:
-                    pm.c_ds *= 1.5
-                if n_i > 3:
-                    pm.c_ds /= 1.5
-
-                if abs(pm.c_ds) < ds_min:
-                    if i is 1 and not pm.c_pmap:
-                        print("\nCheck if there is a periodic orbit and if so"
-                              " use poincare map. (c_pmap=True)")
-                        exit(1)
-                    print("\nStep", i, "did not converge using minimal stepsize"
-                                       " of " + str(ds_min) + "!")
-                    raise ConvergenceError(i)
+                if adaptive_step_size:
+                    if n_i < 2:
+                        pm.c_ds *= 1.5
+                        pm.c_ds = np.clip(pm.c_ds, -ds_max, ds_max)
+                    if n_i > 3:
+                        pm.c_ds /= 1.5
+                    if abs(pm.c_ds) < ds_min:
+                        if i is 1 and not pm.c_pmap:
+                            print("\nCheck if there is a periodic orbit and if so"
+                                  " use poincare map. (c_pmap=True)")
+                            exit(1)
+                        print("\nStep", i, "did not converge using minimal stepsize"
+                                           " of " + str(ds_min) + "!")
+                        raise ConvergenceError(i)
+                else:
+                    if do_newton:
+                        print("\nStep", i, "did not converge!")
+                        raise ConvergenceError(i)
 
             # Stability (larges eigenvalue less than 0)
             stable[i] = np.max(np.linalg.eig(j[:, :-1])[0].real) < 0

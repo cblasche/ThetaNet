@@ -4,8 +4,8 @@ from thetanet.continuation import *
 import time
 
 
-def hopf(pm, init_b=None, init_x=None, init_y=None, init_bcdoxy=None,
-                bcdoxy_output=False, dh1=1e-7, dh2=1e-5):
+def hopf(pm, init_b=None, init_x=None, init_y=None, init_full_state=None,
+         full_state_output=False, adaptive_step_size=True, dh1=1e-7, dh2=1e-5):
     """
     Pseudo arc-length hopf bifurcation continuation scheme.
     A hopf bifurcation which occurred when varying x (pm.c_var) will be
@@ -28,10 +28,13 @@ def hopf(pm, init_b=None, init_x=None, init_y=None, init_bcdoxy=None,
     init_y: float
         Initial condition for second continuation parameter - pseudo arc-length
         continuation will be done on that one.
-    init_bcdoxy : ndarray, 1D float
-        Full initial condition including null vector.
-    bcdoxy_output : bool
+    init_full_state : ndarray, 1D float
+        Full initial condition bcdoxy including eigenvector and -value of zero
+        real part eigenvalue.
+    full_state_output : bool
         Return the full bcdoxy array if True.
+    adaptive_step_size: bool
+        Adjust step size pm.c_ds according to speed of convergence if True.
     dh1 : float
         Precision when building difference quotient.
     dh2 : float
@@ -52,9 +55,9 @@ def hopf(pm, init_b=None, init_x=None, init_y=None, init_bcdoxy=None,
     N = tn.dynamics.degree_network.NQ_for_approach(pm)[0]
 
     # Minimal step size when algorithm should stop
-    ds_min = 0.01 * abs(pm.c_ds)
+    ds_min = 1e-3 * abs(pm.c_ds)
     # Maximal step size which should not be exceeded
-    ds_max = 100 * abs(pm.c_ds)
+    ds_max = 1e2 * abs(pm.c_ds)
 
     # Determine dynamical equation
     dyn = init_dyn_2(pm)
@@ -62,7 +65,7 @@ def hopf(pm, init_b=None, init_x=None, init_y=None, init_bcdoxy=None,
     # Initialise continuation
     bcdoxy = np.zeros((pm.c_steps + 1, 3 * 2 * N + 3))
 
-    if init_bcdoxy is None:
+    if init_full_state is None:
         # Determine eigenvector (c+j*d) and eigenvalue o with maximal real part
         init_b = real_stack(init_b)
         df_db = f_partial_b_2(dyn, init_b, init_x, init_y, dh=dh1)
@@ -87,13 +90,14 @@ def hopf(pm, init_b=None, init_x=None, init_y=None, init_bcdoxy=None,
             bcdoxy[0, :-1] -= np.linalg.solve(j[:, :-1], g)
 
     else:
-        bcdoxy[0] = init_bcdoxy
+        bcdoxy[0] = init_full_state
         init_c = bcdoxy[0, 2 * N:4 * N]
         phi = init_c / np.linalg.norm(init_c) ** 2
 
     # To get the scheme started compute an initial null vector - the direction
     # of the first step. This should be done such that the change in c_var is
     # of the same sign as c_ds.
+    j = jacobian_hopf(dyn, bcdoxy[0], phi, dh1=dh1, dh2=dh2)
     null = null_vector(j)
     if np.sign(null[-1]) < 0:
         null *= -1
@@ -129,16 +133,20 @@ def hopf(pm, init_b=None, init_x=None, init_y=None, init_bcdoxy=None,
                         break
 
                 # Adaptive step size - depending on speed of convergence
-                if n_i < 2:
-                    pm.c_ds *= 1.5
-                    pm.c_ds = np.clip(pm.c_ds, -ds_max, ds_max)
-                if n_i > 3:
-                    pm.c_ds /= 1.5
-
-                if abs(pm.c_ds) < ds_min:
-                    print("\nStep", i, "did not converge using minimal stepsize"
-                                       " of " + str(ds_min) + "!")
-                    raise ConvergenceError(i)
+                if adaptive_step_size:
+                    if n_i < 2:
+                        pm.c_ds *= 1.5
+                        pm.c_ds = np.clip(pm.c_ds, -ds_max, ds_max)
+                    if n_i > 3:
+                        pm.c_ds /= 1.5
+                    if abs(pm.c_ds) < ds_min:
+                        print("\nStep", i, "did not converge using minimal "
+                                           "step size of " + str(ds_min) + "!")
+                        raise ConvergenceError(i)
+                else:
+                    if do_newton:
+                        print("\nStep", i, "did not converge!")
+                        raise ConvergenceError(i)
 
             # Update null vector and make sure direction is roughly the same as
             # previous one
@@ -156,7 +164,7 @@ def hopf(pm, init_b=None, init_x=None, init_y=None, init_bcdoxy=None,
         bcdoxy = bcdoxy[:final_step]
         pass
 
-    if bcdoxy_output:
+    if full_state_output:
         return bcdoxy
     else:
         b, x, y = comp_unit(bcdoxy[:, :2*N].T).T, bcdoxy[:, -2], bcdoxy[:, -1]

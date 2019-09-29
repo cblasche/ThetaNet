@@ -4,8 +4,9 @@ from thetanet.continuation import *
 import time
 
 
-def saddle_node(pm, init_b=None, init_x=None, init_y=None, init_bnxy=None,
-                bnxy_output=False, dh1=1e-7, dh2=1e-5):
+def saddle_node(pm, init_b=None, init_x=None, init_y=None, init_full_state=None,
+                full_state_output=False, adaptive_step_size=True, dh1=1e-7,
+                dh2=1e-5):
     """
     Pseudo arc-length saddle-node bifurcation continuation scheme.
     A saddle-node which occurred when varying x (pm.c_var) will be continued
@@ -25,10 +26,12 @@ def saddle_node(pm, init_b=None, init_x=None, init_y=None, init_bnxy=None,
     init_y: float
         Initial condition for second continuation parameter - pseudo arc-length
         continuation will be done on that one.
-    init_bnxy : ndarray, 1D float
-        Full initial condition including null vector.
-    bnxy_output : bool
+    init_full_state : ndarray, 1D float
+        Full initial condition bnxy including null vector.
+    full_state_output : bool
         Return the full bnxy array if True.
+    adaptive_step_size: bool
+        Adjust step size pm.c_ds according to speed of convergence if True.
     dh1 : float
         Precision when building difference quotient.
     dh2 : float
@@ -58,7 +61,7 @@ def saddle_node(pm, init_b=None, init_x=None, init_y=None, init_bnxy=None,
 
     # Initialise continuation
     bnxy = np.zeros((pm.c_steps + 1, 2 * 2 * N + 2))
-    if init_bnxy is None:
+    if init_full_state is None:
         init_b = real_stack(init_b)
         # Determine eigenvector with eigenvalue with zero real part
         df_db = f_partial_b_2(dyn, init_b, init_x, init_y, dh=dh1)
@@ -70,7 +73,7 @@ def saddle_node(pm, init_b=None, init_x=None, init_y=None, init_bnxy=None,
         bnxy[0, -2] = init_x
         bnxy[0, -1] = init_y
     else:
-        bnxy[0] = init_bnxy
+        bnxy[0] = init_full_state
 
     # Converge with Newton method to saddle-point
     for n_i in range(pm.c_n):
@@ -81,6 +84,7 @@ def saddle_node(pm, init_b=None, init_x=None, init_y=None, init_bnxy=None,
     # To get the scheme started compute an initial null vector - the direction
     # of the first step. This should be done such that the change in c_var is
     # of the same sign as c_ds.
+    j = jacobian_sn(dyn, bnxy[0], dh1=dh1, dh2=dh2)
     null = null_vector(j)
     if np.sign(null[-1]) < 0:
         null *= -1
@@ -113,16 +117,20 @@ def saddle_node(pm, init_b=None, init_x=None, init_y=None, init_bnxy=None,
                         break
 
                 # Adaptive step size - depending on speed of convergence
-                if n_i < 2:
-                    pm.c_ds *= 1.5
-                    pm.c_ds = np.clip(pm.c_ds, -ds_max, ds_max)
-                if n_i > 3:
-                    pm.c_ds /= 1.5
-
-                if abs(pm.c_ds) < ds_min:
-                    print("\nStep", i, "did not converge using minimal stepsize"
-                                       " of " + str(ds_min) + "!")
-                    raise ConvergenceError(i)
+                if adaptive_step_size:
+                    if n_i < 2:
+                        pm.c_ds *= 1.5
+                        pm.c_ds = np.clip(pm.c_ds, -ds_max, ds_max)
+                    if n_i > 3:
+                        pm.c_ds /= 1.5
+                    if abs(pm.c_ds) < ds_min:
+                        print("\nStep", i, "did not converge using minimal "
+                                           "step size of " + str(ds_min) + "!")
+                        raise ConvergenceError(i)
+                else:
+                    if do_newton:
+                        print("\nStep", i, "did not converge!")
+                        raise ConvergenceError(i)
 
             # Update null vector and make sure direction is roughly the same as
             # previous one
@@ -140,7 +148,7 @@ def saddle_node(pm, init_b=None, init_x=None, init_y=None, init_bnxy=None,
         bnxy = bnxy[:final_step]
         pass
 
-    if bnxy_output:
+    if full_state_output:
         return bnxy
     else:
         b, x, y = comp_unit(bnxy[:, :2*N].T).T, bnxy[:, -2], bnxy[:, -1]
