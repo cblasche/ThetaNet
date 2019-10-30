@@ -115,8 +115,8 @@ Gamma = tn.dynamics.degree_network.Gamma(n)     # coefficients for synaptic
 t_start = 0
 t_end = 20
 t_steps = 1000  # write out steps from evolution (not related to precision!)
-t = np.linspace(t_start, t_end, t_steps + 1)
-dt = (t_end - t_start) * 1.0 / t_steps
+t = np.linspace(t_start, t_end, t_steps)
+# dt = (t_end - t_start) * 1.0 / t_steps
 
 
 """ Continuation

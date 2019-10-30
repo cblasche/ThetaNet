@@ -5,7 +5,7 @@ from scipy import sparse
 from time import time
 
 
-def dynamical_equation(t, y, d_n, n, kappa, k_in_mean, A, eta):
+def dynamical_equation(t, y, d_n, n, kappa, k_mean, A, eta):
     """ Theta neuron model by Ermentrout and Kopell.
 
     Parameters
@@ -20,8 +20,8 @@ def dynamical_equation(t, y, d_n, n, kappa, k_in_mean, A, eta):
         Sharpness parameter
     kappa : float
         Coupling constant
-    k_in_mean : float
-        Mean value of all in-degrees
+    k_mean: float
+        Mean degree.
     A : ndarray, 2D int
         Adjacency matrix
     eta: ndarray, 1D float
@@ -34,7 +34,7 @@ def dynamical_equation(t, y, d_n, n, kappa, k_in_mean, A, eta):
     """
 
     P = d_n * (1-np.cos(y))**n
-    I = A.dot(P) / k_in_mean
+    I = A.dot(P) / k_mean
     dydt = 1-np.cos(y) + (1+np.cos(y))*(eta+kappa*I)
 
     return dydt
@@ -59,7 +59,7 @@ def integrate(pm, init=None, console_output=True):
     """
 
     # Initialise network for t=0
-    theta_t = np.zeros((pm.t_steps + 1, pm.N))
+    theta_t = np.zeros((len(pm.t), pm.N))
     # If init is not specified, choose uniform distribution.
     if init is None:
         init = np.linspace(0, 2 * np.pi * (1 - 1 / float(pm.N)), pm.N)
@@ -68,25 +68,25 @@ def integrate(pm, init=None, console_output=True):
     # Initialise integrator
     network = scipy.integrate.ode(dynamical_equation)
     network.set_integrator('dopri5')
-    network.set_initial_value(theta_t[0], pm.t_start)
+    network.set_initial_value(theta_t[0], pm.t[0])
     if pm.A.sum() / pm.N ** 2 < 0.4:  # Check for sparsity of A
-        network.set_f_params(pm.d_n, pm.n, pm.kappa, pm.k_in_mean,
+        network.set_f_params(pm.d_n, pm.n, pm.kappa, pm.k_mean,
                              sparse.csc_matrix(pm.A.astype('float')), pm.eta)
     else:
-        network.set_f_params(pm.d_n, pm.n, pm.kappa, pm.k_in_mean,
+        network.set_f_params(pm.d_n, pm.n, pm.kappa, pm.k_mean,
                              pm.A.astype('float'), pm.eta)
 
     # Time integration
     if console_output:
-        print('\nNetwork with', pm.N, 'nodes | Integrating', pm.t_end,
+        print('\nNetwork with', pm.N, 'nodes | Integrating', pm.t[-1],
           'time units:')
     computation_start = time()
     step = 1
-    while network.successful() and step <= pm.t_steps:
-        network.integrate(network.t + pm.dt)
+    while network.successful() and step <= len(pm.t):
+        network.integrate(network.t + (pm.t[1] - pm.t[0]))
         theta_t[step] = network.y
         if console_output:
-            progress = step / pm.t_steps
+            progress = step / (len(pm.t))
             tn.utils.progress_bar(progress, time()-computation_start)
         step += 1
 
@@ -94,7 +94,7 @@ def integrate(pm, init=None, console_output=True):
 
 
 def dynamical_equation_mean(t, y, Gamma, n, d_n, A, eta_0, delta, kappa,
-                            k_in_mean):
+                            k_mean):
     """ Mean field description of the Theta neuron model.
 
     Parameters
@@ -119,6 +119,8 @@ def dynamical_equation_mean(t, y, Gamma, n, d_n, A, eta_0, delta, kappa,
         excitabilities.
     kappa : float
         Coupling constant.
+    k_mean: float
+        Mean degree.
 
     Returns
     -------
@@ -130,7 +132,7 @@ def dynamical_equation_mean(t, y, Gamma, n, d_n, A, eta_0, delta, kappa,
     for p in range(1, n + 1):
         P += Gamma[p] * (y ** p + np.conjugate(y) ** p)
     P *= d_n
-    I = A.dot(P) / k_in_mean
+    I = A.dot(P) / k_mean
     dydt = -1j * 0.5 * (y - 1) ** 2 + \
            1j * 0.5 * (y + 1) ** 2 * (eta_0 + 1j * delta + kappa * I)
 
@@ -157,7 +159,7 @@ def integrate_mean(pm, init=None, console_output=True):
     """
 
     # Initialise network for t=0
-    z_t = np.zeros((pm.t_steps + 1, pm.N)).astype(complex)
+    z_t = np.zeros((len(pm.t), pm.N)).astype(complex)
     # If init is not specified, choose uniform distribution.
     if init is None:
         init = np.zeros(pm.N)
@@ -166,26 +168,26 @@ def integrate_mean(pm, init=None, console_output=True):
     # Initialise integrator
     network = scipy.integrate.ode(dynamical_equation_mean)
     network.set_integrator('zvode')
-    network.set_initial_value(z_t[0], pm.t_start)
+    network.set_initial_value(z_t[0], pm.t[0])
     if pm.A.sum() / pm.N ** 2 < 0.4:  # Check for sparsity of A
         network.set_f_params(pm.Gamma, pm.n, pm.d_n,
                              sparse.csc_matrix(pm.A.astype('float')), pm.eta_0,
-                             pm.delta, pm.kappa, pm.k_in_mean)
+                             pm.delta, pm.kappa, pm.k_mean)
     else:
         network.set_f_params(pm.Gamma, pm.n, pm.d_n, pm.A.astype('float'),
-                             pm.eta_0, pm.delta, pm.kappa, pm.k_in_mean)
+                             pm.eta_0, pm.delta, pm.kappa, pm.k_mean)
 
     # Time integration
     if console_output:
         print('\nNetwork with', pm.N, 'nodes | Integrating mean field',
-              pm.t_end, 'time units:')
+              pm.t[-1], 'time units:')
     computation_start = time()
     step = 1
-    while network.successful() and step <= pm.t_steps:
-        network.integrate(network.t + pm.dt)
+    while network.successful() and step <= len(pm.t):
+        network.integrate(network.t + (pm.t[1] - pm.t[0]))
         z_t[step] = network.y
         if console_output:
-            progress = step / pm.t_steps
+            progress = step / (len(pm.t))
             tn.utils.progress_bar(progress, time()-computation_start)
         step += 1
 

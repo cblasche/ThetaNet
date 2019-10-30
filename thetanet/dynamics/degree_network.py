@@ -80,7 +80,7 @@ def integrate(pm, init=None, console_output=True):
     N_state_variables, Q = NQ_for_approach(pm)
 
     # Initialise network for t=0
-    b_t = np.zeros((pm.t_steps + 1, N_state_variables)).astype(complex)
+    b_t = np.zeros((len(pm.t), N_state_variables)).astype(complex)
 
     if init is None:
         init = np.zeros(N_state_variables)
@@ -97,21 +97,21 @@ def integrate(pm, init=None, console_output=True):
     # Initialise integrator
     network = scipy.integrate.ode(dynamical_equation)
     network.set_integrator('zvode')
-    network.set_initial_value(b_t[0], pm.t_start)
+    network.set_initial_value(b_t[0], pm.t[0])
     network.set_f_params(pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0,
                          pm.delta, pm.kappa, pm.k_mean)
 
     # Time integration
     if console_output:
         print('\nNetwork with', N_state_variables, 'degrees | Integrating',
-          pm.t_end, 'time units:')
+          pm.t[-1], 'time units:')
     computation_start = time()
     step = 1
-    while network.successful() and step <= pm.t_steps:
-        network.integrate(network.t + pm.dt)
+    while network.successful() and step <= len(pm.t):
+        network.integrate(network.t + pm.t[1] - pm.t[0])
         b_t[step] = network.y
         if console_output:
-            progress = step / pm.t_steps
+            progress = step / (len(pm.t))
             tn.utils.progress_bar(progress, time() - computation_start)
         step += 1
 
