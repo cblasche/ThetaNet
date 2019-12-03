@@ -1,3 +1,9 @@
+import numpy as np
+
+
+
+
+
 def progress_bar(progress, time):
     """ Print progress bar to console output in the format
     Progress: [######### ] 90.0% in 10.22 sec

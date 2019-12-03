@@ -35,11 +35,14 @@ def single_param(pm, init_b=None, init_x=None, init_stability=None,
     stable : ndarray, 1D bool
         Curve of stability information of the respective point in b and x.
     """
-
-    if pm.c_var not in pm.c_lib:
-        print('\n "c_var" is none of the possible choices', pm.c_lib,
+    c_lib = ['kappa', 'eta_0', 'delta', 'rho', 'r']
+    if pm.c_var not in c_lib:
+        print('\n "c_var" is none of the possible choices', c_lib,
               '.')
         exit(1)
+
+    # Determine dynamical equation
+    dyn = init_dyn_1(pm)
 
     N_state_variables, Q = tn.dynamics.degree_network.NQ_for_approach(pm)
 
@@ -52,7 +55,7 @@ def single_param(pm, init_b=None, init_x=None, init_stability=None,
     b_x = np.zeros((pm.c_steps + 1, 2 * N_state_variables + 1))
 
     if init_b is None:
-        init_b = tn.dynamics.degree_network.integrate(pm)[-1]
+        init_b = tn.dynamics.degree_network.integrate(pm, console_output=False)[-1]
         init_b.shape = N_state_variables
         # For poincare map: Integrate initial condition till poincare section
         # is reached.
@@ -77,9 +80,6 @@ def single_param(pm, init_b=None, init_x=None, init_stability=None,
     # Stability information of fixed points
     stable = np.zeros(pm.c_steps + 1)
     stable[0] = init_stability
-
-    # Determine dynamical equation
-    dyn = init_dyn_1(pm)
 
     # To get the scheme started compute an initial null vector - the direction
     # of the first step. This should be done such that the change in c_var is

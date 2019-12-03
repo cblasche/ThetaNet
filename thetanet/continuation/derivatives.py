@@ -1,7 +1,7 @@
 from thetanet.continuation.utils import *
 
 
-def f_partial_b_1(f, b_x, dh=1e-6):
+def f_partial_b_1(f, b_x, dh=1e-7):
     """
     Compute partial derivative of f with respect to b.
     The states b come in real_stack version and need to be made complex first.
@@ -50,7 +50,7 @@ def f_partial_b_1(f, b_x, dh=1e-6):
     return df_db
 
 
-def f_partial_x_1(f, b_x, dh=1e-6):
+def f_partial_x_1(f, b_x, dh=1e-7):
     """
     Compute partial derivative of f with respect to variable x.
     The states b come in real_stack version and need to be made complex first.
@@ -81,7 +81,7 @@ def f_partial_x_1(f, b_x, dh=1e-6):
     return df_dx
 
 
-def f_partial_b_2(f, b, x, y, dh=1e-6):
+def f_partial_b_2(f, b, x, y, dh=1e-7):
     """
     Compute partial derivative of f with respect to b.
     The states b come in real_stack version and need to be made complex first.
@@ -130,7 +130,7 @@ def f_partial_b_2(f, b, x, y, dh=1e-6):
     return df_db
 
 
-def f_partial_x_2(f, b, x, y, dh=1e-6):
+def f_partial_x_2(f, b, x, y, dh=1e-7):
     """
     Compute partial derivative of f with respect to variable x.
     The states b come in real_stack version and need to be made complex first.
@@ -161,7 +161,7 @@ def f_partial_x_2(f, b, x, y, dh=1e-6):
     return df_dx
 
 
-def f_partial_y_2(f, b, x, y, dh=1e-6):
+def f_partial_y_2(f, b, x, y, dh=1e-7):
     """ Compute partial derivative of f with respect to variable y.
     The states b come in real_stack version and need to be made complex first.
     The derivative is computed as a simple difference quotient.
@@ -191,7 +191,7 @@ def f_partial_y_2(f, b, x, y, dh=1e-6):
     return df_dy
 
 
-def jn_partial_b_2(f, b, n, x, y, dh1=1e-6, dh2=1e-6):
+def jn_partial_b_2(f, b, n, x, y, dh1=1e-7, dh2=1e-5):
     """
     Compute directional (n) derivative of jacobian of f with respect to b at
     parameter values x and y.
@@ -228,7 +228,7 @@ def jn_partial_b_2(f, b, n, x, y, dh1=1e-6, dh2=1e-6):
     return djn_db
 
 
-def jn_partial_x_2(f, b, n, x, y, dh1=1e-6, dh2=1e-6):
+def jn_partial_x_2(f, b, n, x, y, dh1=1e-7, dh2=1e-5):
     """
     Compute directional (n) derivative of jacobian of f with respect to x at
     parameter values x and y.
@@ -265,7 +265,7 @@ def jn_partial_x_2(f, b, n, x, y, dh1=1e-6, dh2=1e-6):
     return djn_dx
 
 
-def jn_partial_y_2(f, b, n, x, y, dh1=1e-6, dh2=1e-6):
+def jn_partial_y_2(f, b, n, x, y, dh1=1e-7, dh2=1e-5):
     """
     Compute directional (n) derivative of jacobian of f with respect to y at
     parameter values x and y.

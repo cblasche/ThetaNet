@@ -224,7 +224,7 @@ def dyn_hopf(dyn, bcdoxy, j, phi):
     return g
 
 
-def jacobian_hopf(f, bcdoxy, phi, dh1=1e-6, dh2=1e-6):
+def jacobian_hopf(f, bcdoxy, phi, dh1=1e-7, dh2=1e-5):
     """ Compute Jacobi matrix containing the derivatives of f with respect to
     all states, the eigenvectors c,d, the eigenvalue o, and the continuation
     variables x and y.

@@ -148,54 +148,25 @@ def init_dyn_1(pm):
         as dyn_equ
     from thetanet.dynamics.degree_network import poincare_map as poi_map
 
-    if pm.c_var in ['kappa', 'eta_0', 'delta']:
-        def dyn(b, x):
-            setattr(locals()['pm'], pm.c_var, x)
-            Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
-            args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
-                    pm.kappa, pm.k_mean)
-            if pm.c_pmap:
-                return poi_map(*args)-b
-            else:
-                return dyn_equ(*args)
-
-    if pm.c_var in ['rho', 'r']:
-        if pm.degree_approach == 'full':
-            def dyn(b, x):
-                setattr(locals()['pm'], pm.c_var, x)
-                pm.a = pm.a_func(pm.r)
-                Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
-                args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
-                        pm.kappa, pm.k_mean)
-                if pm.c_pmap:
-                    return poi_map(*args)-b
-                else:
-                    return dyn_equ(*args)
-
-        elif pm.degree_approach == 'virtual':
-            def dyn(b, x):
-                setattr(locals()['pm'], pm.c_var, x)
+    def dyn(b, x):
+        setattr(pm, pm.c_var, x)
+        if pm.c_var == 'rho':
+            if pm.degree_approach == 'virtual':
+                pm.w = pm.w_func(pm.rho)
+            elif pm.degree_approach == 'transform':
+                pm.usv = pm.usv_func(pm.rho)
+        if pm.c_var == 'r':
+            if pm.degree_approach == 'virtual':
                 pm.a_v = pm.a_v_func(pm.r)
-                Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
-                args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
-                        pm.kappa, pm.k_mean)
-                if pm.c_pmap:
-                    return poi_map(*args)-b
-                else:
-                    return dyn_equ(*args)
-
-        elif pm.degree_approach == 'transform':
-            def dyn(b, x):
-                setattr(locals()['pm'], pm.c_var, x)
-                e = tn.utils.essential_fit(*pm.e_list, pm.r_list, pm.r)
-                pm.usv = tn.utils.usv_from_essentials(*e, pm.c_in, pm.c_out)
-                Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
-                args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
-                        pm.kappa, pm.k_mean)
-                if pm.c_pmap:
-                    return poi_map(*args)-b
-                else:
-                    return dyn_equ(*args)
+            elif pm.degree_approach == 'transform':
+                pm.usv = pm.usv_func(pm.r)
+        Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
+        args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
+                pm.kappa, pm.k_mean)
+        if pm.c_pmap:
+            return poi_map(*args)-b
+        else:
+            return dyn_equ(*args)
 
     return dyn
 
@@ -220,10 +191,18 @@ def init_dyn_2(pm):
     from thetanet.dynamics.degree_network import poincare_map as poi_map
 
     def dyn(b, x, y):
-        setattr(locals()['pm'], pm.c_var, x)
-        setattr(locals()['pm'], pm.c_var2, y)
-        e = tn.utils.essential_fit(*pm.e_list, pm.r_list, pm.r)
-        pm.usv = tn.utils.usv_from_essentials(*e, pm.c_in, pm.c_out)
+        setattr(pm, pm.c_var, x)
+        setattr(pm, pm.c_var2, y)
+        if pm.c_var == 'rho' or pm.c_var2 == 'rho':
+            if pm.degree_approach == 'virtual':
+                pm.w = pm.w_func(pm.rho)
+            elif pm.degree_approach == 'transform':
+                pm.usv = pm.usv_func(pm.rho)
+        if pm.c_var == 'r' or pm.c_var2 == 'r':
+            if pm.degree_approach == 'virtual':
+                pm.a_v = pm.a_v_func(pm.r)
+            elif pm.degree_approach == 'transform':
+                pm.usv = pm.usv_func(pm.r)
         Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
         args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
                 pm.kappa, pm.k_mean)

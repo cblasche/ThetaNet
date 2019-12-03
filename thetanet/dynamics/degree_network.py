@@ -107,8 +107,8 @@ def integrate(pm, init=None, console_output=True):
           pm.t[-1], 'time units:')
     computation_start = time()
     step = 1
-    while network.successful() and step <= len(pm.t):
-        network.integrate(network.t + pm.t[1] - pm.t[0])
+    while network.successful() and step < len(pm.t):
+        network.integrate(pm.t[step])
         b_t[step] = network.y
         if console_output:
             progress = step / (len(pm.t))
@@ -180,7 +180,7 @@ def NQ_for_approach(pm):
 
     else:
         print('\n "degree_approach" is none of the possible choices',
-              pm.degree_approach_lib, '.')
+              '"full", "virtual", "transform".')
         quit(1)
 
     return N_state_variables, Q

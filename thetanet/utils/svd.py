@@ -344,3 +344,29 @@ def E_from_usv(u, s, v):
     E = (u.T * s) @ v
 
     return E
+
+
+def usv_func_from_svd_list(svd):
+    """ Return a function that interpolates usv within the range of r_list for
+    a given r.
+
+    Parameters
+    ----------
+    svd : NpzFile
+        SVD data including 'u', 's', 'v', 'r_list', 'c_in', 'c_out'
+
+    Returns
+    -------
+    usv_func : function
+        Function to compute usv for a given r.
+    """
+    e_list = svd['u'], svd['s'], svd['v']
+    r_list = svd['r_list']
+    c_in, c_out = svd['c_in'], svd['c_out']
+
+    def usv_func(r):
+        e = tn.utils.essential_fit(*e_list, r_list, r)
+        usv = tn.utils.usv_from_essentials(*e, c_in, c_out)
+        return usv
+
+    return usv_func
