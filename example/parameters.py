@@ -39,7 +39,7 @@ d_n = 2**n * (np.math.factorial(n)) ** 2 /\
 Gamma = tn.dynamics.degree_network.Gamma(n)  # ensemble coefficients
 
 # eta ’s drawn from Lorentzian ( Cauchy ) distribution
-eta_0 = 0  # center of distribution
+eta_0 = .0  # center of distribution
 delta = 0.05  # width of distribution
 
 # time

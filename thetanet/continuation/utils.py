@@ -150,19 +150,23 @@ def init_dyn_1(pm):
 
     def dyn(b, x):
         setattr(pm, pm.c_var, x)
+
         if pm.c_var == 'rho':
-            if pm.degree_approach == 'virtual':
-                pm.w = pm.w_func(pm.rho)
+            if pm.degree_approach in ['virtual', 'virtual_in_only']:
+                pm.P_k_v = pm.P_k_v_func(pm.rho)
             elif pm.degree_approach == 'transform':
                 pm.usv = pm.usv_func(pm.rho)
+
         if pm.c_var == 'r':
-            if pm.degree_approach == 'virtual':
+            if pm.degree_approach in ['virtual', 'virtual_in_only']:
                 pm.a_v = pm.a_v_func(pm.r)
             elif pm.degree_approach == 'transform':
                 pm.usv = pm.usv_func(pm.r)
+
         Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
         args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
                 pm.kappa, pm.k_mean)
+
         if pm.c_pmap:
             return poi_map(*args)-b
         else:
@@ -193,19 +197,23 @@ def init_dyn_2(pm):
     def dyn(b, x, y):
         setattr(pm, pm.c_var, x)
         setattr(pm, pm.c_var2, y)
+
         if pm.c_var == 'rho' or pm.c_var2 == 'rho':
-            if pm.degree_approach == 'virtual':
-                pm.w = pm.w_func(pm.rho)
+            if pm.degree_approach in ['virtual', 'virtual_in_only']:
+                pm.P_k_v = pm.P_k_v_func(pm.rho)
             elif pm.degree_approach == 'transform':
                 pm.usv = pm.usv_func(pm.rho)
+
         if pm.c_var == 'r' or pm.c_var2 == 'r':
-            if pm.degree_approach == 'virtual':
+            if pm.degree_approach in ['virtual', 'virtual_in_only']:
                 pm.a_v = pm.a_v_func(pm.r)
             elif pm.degree_approach == 'transform':
                 pm.usv = pm.usv_func(pm.r)
+
         Q = tn.dynamics.degree_network.NQ_for_approach(pm)[1]
         args = (0, b, pm.Gamma, pm.n, pm.d_n, Q, pm.eta_0, pm.delta,
                 pm.kappa, pm.k_mean)
+
         if pm.c_pmap:
             return poi_map(*args)-b
         else:

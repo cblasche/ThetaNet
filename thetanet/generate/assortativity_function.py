@@ -275,7 +275,7 @@ def a_func_4d_to_2d(a, P_k_in, P_k_out, i_prop, j_prop):
     return a
 
 
-def a_func_linear(k_in, k_out, P_k, N, c, i_prop, j_prop):
+def a_func_linear(k_in, k_out, P_k, N, c=0, i_prop='in', j_prop='out'):
     """ Assortativity function.
     Based on the linear approach for neutral assortativity and extended with
     the addition method to introduce assortativity.
@@ -287,7 +287,8 @@ def a_func_linear(k_in, k_out, P_k, N, c, i_prop, j_prop):
     k_out : ndarray, 1D float
         Out-degree probability.
     P_k : ndarray, 2D float
-        Joint In-/Out-degree distribution.
+        Joint In-/Out-degree distribution. For 'virtual' degree_approach let
+        this be P_k_v*w.
     N : int
         Number of neurons.
     c : float

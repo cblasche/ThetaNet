@@ -504,7 +504,7 @@ def chung_lu_model(K_in, K_out, k_in=None, k_out=None, P_k=None, c=0,
     T = np.outer(K_in, K_out) / (N * K_in.mean())
 
     if c != 0:
-        if None in [k_in, k_out, P_k]:
+        if np.any([array is None for array in [k_in, k_out, P_k]]):
             print('Chung Lu model requires k_in, k_out and P_k in order to compute'
                   ' correct mean values.')
             quit()

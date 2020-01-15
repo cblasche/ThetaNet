@@ -104,7 +104,7 @@ def integrate(pm, init=None, console_output=True):
     # Time integration
     if console_output:
         print('\nNetwork with', N_state_variables, 'degrees | Integrating',
-          pm.t[-1], 'time units:')
+              pm.t[-1], 'time units:')
     computation_start = time()
     step = 1
     while network.successful() and step < len(pm.t):
@@ -169,10 +169,18 @@ def NQ_for_approach(pm):
         Q = pm.P_k.flatten()[None, :] * pm.N * \
             pm.a.reshape(N_state_variables, N_state_variables)
 
+    if pm.degree_approach == 'full_in_only':
+        N_state_variables = pm.N_k_in
+        Q = (pm.P_k[None, ...] * pm.N * pm.a.mean(1)).sum(2)
+
     elif pm.degree_approach == 'virtual':
         N_state_variables = pm.N_mu_in * pm.N_mu_out
-        Q = pm.w.flatten()[None, :] * pm.N * \
+        Q = pm.w.flatten()[None, :] * pm.P_k_v.flatten()[None, :] * pm.N * \
             pm.a_v.reshape(N_state_variables, N_state_variables)
+
+    elif pm.degree_approach == 'virtual_in_only':
+        N_state_variables = pm.N_mu_in
+        Q = (pm.w[None, ...] * pm.P_k_v[None, ...] * pm.N * pm.a_v.mean(1)).sum(2)
 
     elif pm.degree_approach == 'transform':
         N_state_variables = pm.N_c_in * pm.N_c_out
@@ -180,7 +188,8 @@ def NQ_for_approach(pm):
 
     else:
         print('\n "degree_approach" is none of the possible choices',
-              '"full", "virtual", "transform".')
+              '"full", "full_in_only", "virtual", "virtual_in_only",'
+              ' "transform".')
         quit(1)
 
     return N_state_variables, Q

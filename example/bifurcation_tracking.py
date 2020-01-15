@@ -25,7 +25,7 @@ def main():
     [continue_and_plot(i) for i in sn]
     plt.axis([-0.7, -0.3, -0.8, 0.8])
     plt.xlabel(r'$\eta_0$')
-    plt.ylabel(r'$\rho$')
+    plt.ylabel(r'$\hat{\rho}$')
     plt.show()
 
 

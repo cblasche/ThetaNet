@@ -79,11 +79,11 @@ def integrate(pm, init=None, console_output=True):
     # Time integration
     if console_output:
         print('\nNetwork with', pm.N, 'nodes | Integrating', pm.t[-1],
-          'time units:')
+              'time units:')
     computation_start = time()
     step = 1
-    while network.successful() and step <= len(pm.t):
-        network.integrate(network.t + (pm.t[1] - pm.t[0]))
+    while network.successful() and step < len(pm.t):
+        network.integrate(pm.t[step])
         theta_t[step] = network.y
         if console_output:
             progress = step / (len(pm.t))
@@ -184,7 +184,6 @@ def integrate_mean(pm, init=None, console_output=True):
     computation_start = time()
     step = 1
     while network.successful() and step < len(pm.t):
-        # network.integrate(network.t + (pm.t[1] - pm.t[0]))
         network.integrate(pm.t[step])
         z_t[step] = network.y
         if console_output:

@@ -7,8 +7,7 @@ setup(
 
     install_requires=['numpy',
                       'scipy',
-                      'matplotlib',
-                      'time'],
+                      'matplotlib'],
 
     author=u"Christian Blasche",
     author_email="c.b@mail.de",
