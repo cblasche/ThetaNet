@@ -324,7 +324,7 @@ def assortative_mixing(A, r, i_prop='in', j_prop='out', console_output=True,
         K_i_prop = eval('K_' + i_prop)
         K_j_prop = eval('K_' + j_prop)
         K_mean_edge_i = (K_i_prop[np.append(I[0], J[0])]).sum() / num_edges
-        K_mean_edge_j = (K_i_prop[np.append(I[1], J[1])]).sum() / num_edges
+        K_mean_edge_j = (K_j_prop[np.append(I[1], J[1])]).sum() / num_edges
         cor_original = (K_i_prop[I[0]] - K_mean_edge_i) * \
                        (K_j_prop[I[1]] - K_mean_edge_j) + \
                        (K_i_prop[J[0]] - K_mean_edge_i) * \
