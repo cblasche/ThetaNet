@@ -7,7 +7,7 @@
 * __Numerically continue solutions with respect to coupling strength, intrinsic excitability or degree correlation/assortativity__
 
 
- Related research articles are available on arXiv: [here](https://arxiv.org/abs/2004.00240) and [here](https://arxiv.org/abs/2004.00206).
+ Related research articles are available on arXiv: [__here__](https://arxiv.org/abs/2004.00240) and [__here__](https://arxiv.org/abs/2004.00206).
 
 
 For more details please read [__documentation.pdf__](https://github.com/cblasche/ThetaNet/blob/master/doc/documentation.pdf).
