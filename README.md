@@ -10,4 +10,4 @@
  Related research articles are available on arXiv: [__here__](https://arxiv.org/abs/2004.00240) and [__here__](https://arxiv.org/abs/2004.00206).
 
 
-For more details please read [__documentation.pdf__](https://github.com/cblasche/ThetaNet/blob/master/doc/documentation.pdf).
+For more details please read the [__documentation__](https://github.com/cblasche/ThetaNet/blob/master/doc/doc_ThetaNet.pdf).
